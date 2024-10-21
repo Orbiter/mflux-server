@@ -1,1 +1,5 @@
-mflux
+mlx==0.19.3
+mflux>=0.4.1
+flask
+flask-restx
+flask-cors
