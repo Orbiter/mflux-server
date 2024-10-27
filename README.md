@@ -25,9 +25,12 @@ Furthermore, the API exposes a swagger endpoint to self-document the server.
 
 ## Example usage
 
-The server can be started with i.e.
+The server can be installed and started with i.e.
 ```
-python3 server.py --quantize 8
+python3 -m venv .venv
+source .venv/bin/activate
+pip3 install -r requirements.txt
+python3 server.py --quantize 8 --host 0.0.0.0
 ```
 
 It then runs on port 4030 by default. Host an port can be configured by call parameters, try `server.py --help`. To see the swagger documentation, open `http://localhost:4030/swagger`
