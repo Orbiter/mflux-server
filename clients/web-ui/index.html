@@ -8,7 +8,7 @@
 -->
 <head>
     <meta charset="UTF-8">
-    <title>mflux image generation</title>
+    <title>FLUX Image Generation</title>
     <style>
         /* lit.css content with adjustments */
         *{box-sizing:border-box}*+*{margin:.3em 0}pre{overflow:auto}@media(min-width:35em){.col{display:table-cell}.\31{width:5%}.\32{width:15%}.\33{width:22%}.\34{width:30%}.\35{width:40%}.\36{width:50%}.\38{width:84%}.row{display:table;border-spacing:.5em 0}}.row,.w-100{width:100%}.card:focus,hr{outline:0;border:solid #fa0}.card,pre{padding:.5em;border:solid #eee}.btn:hover,a:hover{opacity:.6}.c{padding:.5em;margin:auto;font:1em/1.4 sans-serif}a{color:#fa0;text-decoration:none}.btn.primary{color:#000;background:#fa0;border:none}td,th{padding:.5em;text-align:left;border-bottom:solid #eee}.btn{padding:.5em;background:#fa0;color:#000;border:none;font:.7em sans-serif}
@@ -238,6 +238,12 @@
                             <div><span id="height-value">512</span> px</div>
                         </div>
                     </div>
+                    <div class="col 1">
+                        <div class="input-group">
+                            <label class="input-label" for="aspect-ratio">Aspect Ratio:</label>
+                            <div id="aspect-ratio" style="color: lightgreen">1:1</div>
+                        </div>
+                    </div>                    
                     <div class="col 2">
                         <div class="input-group">
                             <label class="input-label" for="steps">Inference Steps:</label>
@@ -286,6 +292,7 @@
         // List of allowed image size values
         const widthValues  = [256, 320, 512, 640, 768, 800, 1024, 1280, 1920, 2048, 2560];
         const heightValues = [200, 240, 256, 360, 480, 512, 576, 600, 720, 768, 800, 960, 1024, 1080, 1200, 1440, 1600, 2048, 2560];
+        const acceptedAspectRatio = ["1:1", "5:4", "4:3", "3:2", "14:9", "16:10", "5:3", "16:9", "2:1"];
 
         document.addEventListener('DOMContentLoaded', function() {
 
@@ -318,6 +325,24 @@
                 slider.style.setProperty('--slider-value', ((val - min) * 100) / (max - min) + '%');
             }
 
+            function updateAspectRatio() {
+                const width = parseInt(document.getElementById('width').value);
+                const height = parseInt(document.getElementById('height').value);
+                const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+                const divisor = gcd(width, height);
+                const aspectRatio = `${width / divisor}:${height / divisor}`;
+
+                const aspectRatioElement = document.getElementById('aspect-ratio');
+                aspectRatioElement.textContent = aspectRatio;
+
+                // Set color based on whether aspect ratio is accepted
+                if (acceptedAspectRatio.includes(aspectRatio)) {
+                    aspectRatioElement.style.color = "lightgreen";
+                } else {
+                    aspectRatioElement.style.color = "red"; // Reset to default color
+                }
+            }
+
             var rangeInputs = [
                 [document.getElementById('width'), widthValues],
                 [document.getElementById('height'), heightValues],
@@ -340,6 +365,7 @@
                     }
                     document.getElementById(input.id + '-value').textContent = v;
                     updateSliderBackground(input);
+                    updateAspectRatio();
                 });
             });
 
