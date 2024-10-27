@@ -16,28 +16,30 @@ from flask import Flask, request, Response, jsonify
 from flask_restx import Api, Resource, fields
 from flask_cors import CORS
 from mflux import Flux1, Config, ModelConfig, ImageUtil
+from flask import send_file, redirect
 
 import requests
 
 # monkey pathing the Session to ignore SSL verification
 old_request = requests.Session.request
-
 def new_request(self, *args, **kwargs):
     kwargs['verify'] = False
     return old_request(self, *args, **kwargs)
-
 requests.Session.request = new_request
-
 
 app = Flask(__name__)
 api = Api(app, version='1.0', title='MFLUX API Server',
-          description='An image generation server. Workflow: /generate -> /status -> /image', doc='/swagger')
+          description='An image generation server. Workflow: /generate -> /status -> /image',
+          doc='/swagger',
+          prefix='/api')
+
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 tasklist = []         # list which holds the image computation tasks
 flux = None           # the flux object, initialized in main()
 pixels = 1024 * 1024  # the number of pixels in all of the computed images (start value)
 ctime = 80            # the total computation time for all images in seconds (start value)
+apppath = os.path.dirname(__file__)
 
 # we implement image generation as asynchronous task
 # this will be executed in a separate thread
@@ -61,10 +63,10 @@ def compute_image_task():
                 seed=task['seed'],
                 prompt=task['prompt'],
                 config=Config(
-                    num_inference_steps=task['steps'],
+                    num_inference_steps=task['steps'] or 4,
                     height=task['height'],
                     width=task['width'],
-                    guidance=task['guidance'],
+                    guidance=task['guidance'] or 3.5,
                 )
             )
             image = generated_image.image # PIL.Image.Image
@@ -327,7 +329,24 @@ class ClearTasks(Resource):
         """
         tasklist.clear()
         return Response(status=200)
-   
+
+
+# convenience file endpoints for testing
+
+@app.route('/')
+def redirect_to_index():
+    return redirect('/index.html')
+
+@app.route('/index.html')
+def serve_index():
+    return send_file(os.path.join(apppath, 'clients/web-ui/index.html'))
+
+#@api.route('/index.html')
+#class Root(Resource):
+#    @api.response(200, 'Success')
+#    def get(self):
+#        return send_file(os.path.join(apppath, 'clients/web-ui/index.html'))   
+
 def main():
     parser = argparse.ArgumentParser(description='Start a server to generate images with mflux.')
     parser.add_argument('--model', "-m", type=str, default="schnell", choices=["dev", "schnell"], help='The model to use ("schnell" or "dev").')

@@ -185,7 +185,7 @@
         #image-container {
             align-items: flex-start;
         }
-        @media (max-width: 600px) {
+        @media (max-width: 640px) {
             .row .col {
                 display: block;
                 width: 100%;
@@ -218,7 +218,7 @@
                     <div class="col 2">
                         <div class="input-group">
                             <label class="input-label" for="mflux-server">mflux-server:</label>
-                            <input type="text" id="mflux-server" name="mflux-server" value="http://localhost:4030" style="width: 180px;">
+                            <input type="text" id="mflux-server" name="mflux-server" value="http://127.0.0.1:4030" style="width: 180px;">
                         </div>
                     </div>
                 </div>
@@ -227,14 +227,14 @@
                     <div class="col 2">
                         <div class="input-group">
                             <label class="input-label" for="width">Width:</label>
-                            <input type="range" id="width" name="width" min="64" max="2560" step="64" value="512">
+                            <input type="range" id="width" name="width" min="64" max="2560" step="8" value="512">
                             <div><span id="width-value">512</span> px</div>
                         </div>
                     </div>
                     <div class="col 2">
                         <div class="input-group">
                             <label class="input-label" for="height">Height:</label>
-                            <input type="range" id="height" name="height" min="64" max="2560" step="64" value="512">
+                            <input type="range" id="height" name="height" min="64" max="2560" step="8" value="512">
                             <div><span id="height-value">512</span> px</div>
                         </div>
                     </div>
@@ -283,12 +283,32 @@
         </div>
     </div>
     <script>
+        // List of allowed image size values
+        const widthValues  = [256, 320, 512, 640, 768, 800, 1024, 1280, 1920, 2048, 2560];
+        const heightValues = [200, 240, 256, 360, 480, 512, 576, 600, 720, 768, 800, 960, 1024, 1080, 1200, 1440, 1600, 2048, 2560];
+
         document.addEventListener('DOMContentLoaded', function() {
 
-            // Update range input value labels
-            function updateValue(id, value) {
-                document.getElementById(id + '-value').textContent = value;
+            // handle mfluxendpoint
+            var mfluxServerInput = document.getElementById('mflux-server');
+
+            // Load saved mflux-server value from localStorage
+            var savedMfluxServer = localStorage.getItem('mflux-server');
+            if (savedMfluxServer) {
+                mfluxServerInput.value = savedMfluxServer;
+            } else {
+                const protocol = window.location.protocol;
+                const hostname = window.location.hostname;
+                const port = window.location.port;
+                mfluxServerInput.value = `${protocol}//${hostname}:${port}`;
             }
+            var mfluxendpoint = mfluxServerInput.value;
+
+            // Update mfluxendpoint when the input value changes
+            mfluxServerInput.addEventListener('input', function() {
+                mfluxendpoint = mfluxServerInput.value;
+                localStorage.setItem('mflux-server', mfluxendpoint);
+            });
 
             function updateSliderBackground(slider) {
                 if (slider.type !== 'range') return;
@@ -298,36 +318,29 @@
                 slider.style.setProperty('--slider-value', ((val - min) * 100) / (max - min) + '%');
             }
 
-            var widthInput = document.getElementById('width');
-            var heightInput = document.getElementById('height');
-            var stepsInput = document.getElementById('steps');
-            var qualityInput = document.getElementById('quality');
-            var countInput = document.getElementById('count');
-            var rangeInputs = [widthInput, heightInput, stepsInput, qualityInput, countInput];
+            var rangeInputs = [
+                [document.getElementById('width'), widthValues],
+                [document.getElementById('height'), heightValues],
+                [document.getElementById('steps'), null],
+                [document.getElementById('quality'), null],
+                [document.getElementById('count'), null]
+            ];
 
-            rangeInputs.forEach(function(input) {
+            rangeInputs.forEach(function(inputt) {
+                var input = inputt[0];
+                var allowed = inputt[1];
                 updateSliderBackground(input);
                 input.addEventListener('input', function() {
-                    updateValue(input.id, input.value);
+                    let v = input.value;
+                    if (allowed) {
+                        v = allowed.reduce((prev, curr) =>
+                            Math.abs(curr - v) < Math.abs(prev - v) ? curr : prev
+                        );
+                        input.value = v;
+                    }
+                    document.getElementById(input.id + '-value').textContent = v;
                     updateSliderBackground(input);
                 });
-            });
-
-            // Handle mflux-server input and localStorage
-            var mfluxServerInput = document.getElementById('mflux-server');
-
-            // Load saved mflux-server value from localStorage
-            var savedMfluxServer = localStorage.getItem('mflux-server');
-            if (savedMfluxServer) {
-                mfluxServerInput.value = savedMfluxServer;
-            }
-
-            var mfluxendpoint = mfluxServerInput.value;
-
-            // Update mfluxendpoint when the input value changes
-            mfluxServerInput.addEventListener('input', function() {
-                mfluxendpoint = mfluxServerInput.value;
-                localStorage.setItem('mflux-server', mfluxendpoint);
             });
 
             // Handle form submission
@@ -391,7 +404,7 @@
                     statusTextArea.value = "Generating image " + imageNumber + " of " + count + "...";
 
                     // Send POST request to /generate
-                    fetch(mfluxendpoint + '/generate', {
+                    fetch(mfluxendpoint + '/api/generate', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -418,7 +431,7 @@
 
                 function pollStatus(task_id, imageNumber) {
                     var pollInterval = setInterval(function() {
-                        fetch(mfluxendpoint + '/status?task_id=' + task_id)
+                        fetch(mfluxendpoint + '/api/status?task_id=' + task_id)
                         .then(function(response) {
                             if (!response.ok) {
                                 throw new Error('Failed to get status.');
@@ -430,7 +443,7 @@
                             if (status === "done") {
                                 clearInterval(pollInterval);
                                 // Get the image
-                                fetch(mfluxendpoint + '/image?task_id=' + task_id + '&base64=false&delete=true')
+                                fetch(mfluxendpoint + '/api/image?task_id=' + task_id + '&base64=false&delete=true')
                                 .then(function(imageResp) {
                                     if (!imageResp.ok) {
                                         throw new Error('Failed to retrieve image.');

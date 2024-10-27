@@ -26,14 +26,13 @@ def generate_image_gradio(prompt, width, height, steps, seed, format, quality, p
         "height": int(height),
         "width": int(width),
         "steps": int(steps),
-        "guidance": 3.5,
         "format": format,
         "quality": int(quality),
         "priority": priority
     }
     if seed is not None and seed != "":
         data["seed"] = str(seed)
-    response = requests.post(mfluxendpoint + "/generate", json=data)
+    response = requests.post(mfluxendpoint + "/api/generate", json=data)
     if response.status_code != 200:
         yield None, "Failed to start image generation."
         return
@@ -44,7 +43,7 @@ def generate_image_gradio(prompt, width, height, steps, seed, format, quality, p
     yield None, status_text
     # Start polling for status
     for _ in range(10000):
-        status_resp = requests.get(f"{mfluxendpoint}/status?task_id={task_id}")
+        status_resp = requests.get(f"{mfluxendpoint}/api/status?task_id={task_id}")
         if status_resp.status_code != 200:
             yield None, "Failed to get status."
             return
@@ -60,7 +59,7 @@ def generate_image_gradio(prompt, width, height, steps, seed, format, quality, p
             yield None, status_text
             time.sleep(1)
     # Get the image
-    image_resp = requests.get(f"{mfluxendpoint}/image?task_id={task_id}&base64=false&delete=true")
+    image_resp = requests.get(f"{mfluxendpoint}/api/image?task_id={task_id}&base64=false&delete=true")
     if image_resp.status_code != 200:
         yield None, "Failed to retrieve image."
         return
