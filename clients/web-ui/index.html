@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>mflux image generation</title>
+    <style>
+        /* lit.css content with adjustments */
+        *{box-sizing:border-box}*+*{margin:.3em 0}pre{overflow:auto}@media(min-width:35em){.col{display:table-cell}.\31{width:5%}.\32{width:15%}.\33{width:22%}.\34{width:30%}.\35{width:40%}.\36{width:50%}.\38{width:84%}.row{display:table;border-spacing:.5em 0}}.row,.w-100{width:100%}.card:focus,hr{outline:0;border:solid #fa0}.card,pre{padding:.5em;border:solid #eee}.btn:hover,a:hover{opacity:.6}.c{padding:.5em;margin:auto;font:1em/1.4 sans-serif}a{color:#fa0;text-decoration:none}.btn.primary{color:#000;background:#fa0;border:none}td,th{padding:.5em;text-align:left;border-bottom:solid #eee}.btn{padding:.5em;background:#fa0;color:#000;border:none;font:.7em sans-serif}
+        /* Font settings: one sans-serif font, no bold */
+        body, .c, h1, h2, h3, h4, h5, h6, label, input, textarea, button {
+            font-family: sans-serif;
+            font-weight: normal;
+        }
+	h1 {
+	    margin: 0;
+            padding: 0;
+        }
+        /* Dark mode adjustments */
+        body {
+            background-color: #000;
+            color: #fff;
+        }
+        .c {
+            max-width: none;
+        }
+        /* Input and output containers */
+        .input-container, .output-container {
+            background-color: #333;
+            padding: .5em;
+            border-radius: 5px;
+            margin-bottom: .5em;
+        }
+        .input-label {
+            display: block;
+            margin-bottom: .3em;
+            font-weight: normal;
+            color: #fff;
+        }
+        input, textarea {
+            background-color: #555;
+            color: #fff;
+            border: none;
+            padding: .3em;
+            width: 100%;
+        }
+        input[type="range"] {
+            width: 100%;
+            -webkit-appearance: none;
+            background: #777;
+            height: 5px;
+            border-radius: 5px;
+            outline: none;
+            margin-bottom: .5em;
+        }
+        /* Slider track and thumb styling */
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 5px;
+            background: linear-gradient(to right, #fa0 0%, #fa0 var(--slider-value, 50%), #777 var(--slider-value, 50%), #777 100%);
+            border-radius: 5px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 15px;
+            height: 15px;
+            background: #fa0;
+            cursor: pointer;
+            border-radius: 50%;
+            margin-top: -5px; /* Offset to center the thumb */
+        }
+        input[type="range"]::-moz-range-track {
+            height: 5px;
+            background: #777;
+            border-radius: 5px;
+        }
+        input[type="range"]::-moz-range-progress {
+            background: #fa0;
+            height: 5px;
+            border-radius: 5px;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 15px;
+            height: 15px;
+            background: #fa0;
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+        }
+        .btn.primary {
+            background-color: #fa0;
+            color: #000;
+            border: none;
+            padding: 1em 2em; /* Increased size */
+            font-size: 1.2em;
+            line-height: 10px;
+        }
+        .btn.primary:hover {
+            opacity: .8;
+        }
+        .row .col {
+            vertical-align: top;
+            padding-right: .5em;
+        }
+        .full-width {
+            width: 100%;
+        }
+        textarea {
+            resize: vertical;
+        }
+        #generate-button {
+            margin-top: .3em;
+            width: 200px; /* Double original size */
+            height: 40px;
+            background-color: #fa0;
+            color: #000;
+            border: none;
+            font-size: 0.9em;
+        }
+        .center {
+            text-align: center;
+        }
+        #status {
+            margin-bottom: .5em;
+            background-color: #555;
+            color: #fff;
+            border: none;
+            padding: .5em;
+            border-radius: 5px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        /* Image container styles */
+        #image-container {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: .5em;
+            background-color: #333;
+            padding: .5em;
+            border-radius: 5px;
+        }
+        .image-wrapper {
+            position: relative;
+            margin: 0;
+            padding: 0;
+            display: inline-block;
+        }
+        .image-wrapper img {
+            max-width: 100%;
+            width: 400px; /* Increased size */
+            height: auto;
+            margin: 0;
+            cursor: pointer;
+            display: block;
+        }
+        .download-button {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            padding: 2px 5px;
+            font-size: 12px;
+            background-color: #fa0;
+            color: #000;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            opacity: 0.8;
+        }
+        .download-button:hover {
+            opacity: 1;
+        }
+        /* Remove gaps between images */
+        #image-container {
+            margin: 0;
+            padding: 0;
+        }
+        .image-wrapper {
+            margin: 0;
+        }
+        /* Remove gap between rows */
+        #image-container {
+            align-items: flex-start;
+        }
+        @media (max-width: 600px) {
+            .row .col {
+                display: block;
+                width: 100%;
+                padding-right: 0;
+            }
+            #generate-button {
+                width: 100%;
+            }
+            .image-wrapper img {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="c">
+        <h1>FLUX Image Generation</h1>
+        ...using the <a href="https://github.com/orbiter/mflux-server">mflux-server</a> (Github <a href="https://github.com/orbiter/mflux-server">https://github.com/orbiter/mflux-server</a>)
+        <!-- Input Container -->
+        <div class="input-container">
+            <form id="generate-form">
+                <!-- First Line: Prompt and mflux-server -->
+                <div class="row">
+                    <div class="col 8">
+                        <div class="input-group">
+                            <label class="input-label" for="prompt">Prompt:</label>
+                            <textarea id="prompt" name="prompt" rows="3"></textarea>
+                        </div>
+                    </div>
+                    <div class="col 2">
+                        <div class="input-group">
+                            <label class="input-label" for="mflux-server">mflux-server:</label>
+                            <input type="text" id="mflux-server" name="mflux-server" value="http://localhost:4030" style="width: 180px;">
+                        </div>
+                    </div>
+                </div>
+                <!-- Second Line: Sliders and Seed -->
+                <div class="row">
+                    <div class="col 2">
+                        <div class="input-group">
+                            <label class="input-label" for="width">Width:</label>
+                            <input type="range" id="width" name="width" min="64" max="2560" step="64" value="512">
+                            <div><span id="width-value">512</span> px</div>
+                        </div>
+                    </div>
+                    <div class="col 2">
+                        <div class="input-group">
+                            <label class="input-label" for="height">Height:</label>
+                            <input type="range" id="height" name="height" min="64" max="2560" step="64" value="512">
+                            <div><span id="height-value">512</span> px</div>
+                        </div>
+                    </div>
+                    <div class="col 2">
+                        <div class="input-group">
+                            <label class="input-label" for="steps">Inference Steps:</label>
+                            <input type="range" id="steps" name="steps" min="1" max="8" step="1" value="4">
+                            <div><span id="steps-value">4</span></div>
+                        </div>
+                    </div>
+                    <div class="col 2">
+                        <div class="input-group">
+                            <label class="input-label" for="quality">JPEG Quality:</label>
+                            <input type="range" id="quality" name="quality" min="1" max="100" step="1" value="85">
+                            <div><span id="quality-value">85</span></div>
+                        </div>
+                    </div>
+                    <div class="col 2">
+                        <div class="input-group">
+                            <label class="input-label" for="count">Count:</label>
+                            <input type="range" id="count" name="count" min="1" max="16" step="1" value="1">
+                            <div><span id="count-value">1</span></div>
+                        </div>
+                    </div>
+                    <div class="col 2">
+                        <div class="input-group">
+                            <label class="input-label" for="seed">Seed (optional):</label>
+                            <input type="text" id="seed" name="seed" placeholder="Leave blank for random seed" class="full-width">
+                        </div>
+                    </div>
+                </div>
+                <!-- Generate Image Button -->
+                <div class="row center">
+                    <button type="submit" class="btn primary" id="generate-button">Generate Image(s)</button>
+                </div>
+            </form>
+        </div>
+        <!-- Output Container -->
+        <div class="output-container">
+            <!-- Status Field (No Headline) -->
+            <div>
+                <textarea id="status" rows="2" readonly></textarea>
+            </div>
+            <!-- Image Container -->
+            <div id="image-container"></div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+
+            // Update range input value labels
+            function updateValue(id, value) {
+                document.getElementById(id + '-value').textContent = value;
+            }
+
+            function updateSliderBackground(slider) {
+                if (slider.type !== 'range') return;
+                var min = slider.min ? slider.min : 0;
+                var max = slider.max ? slider.max : 100;
+                var val = slider.value;
+                slider.style.setProperty('--slider-value', ((val - min) * 100) / (max - min) + '%');
+            }
+
+            var widthInput = document.getElementById('width');
+            var heightInput = document.getElementById('height');
+            var stepsInput = document.getElementById('steps');
+            var qualityInput = document.getElementById('quality');
+            var countInput = document.getElementById('count');
+            var rangeInputs = [widthInput, heightInput, stepsInput, qualityInput, countInput];
+
+            rangeInputs.forEach(function(input) {
+                updateSliderBackground(input);
+                input.addEventListener('input', function() {
+                    updateValue(input.id, input.value);
+                    updateSliderBackground(input);
+                });
+            });
+
+            // Handle mflux-server input and localStorage
+            var mfluxServerInput = document.getElementById('mflux-server');
+
+            // Load saved mflux-server value from localStorage
+            var savedMfluxServer = localStorage.getItem('mflux-server');
+            if (savedMfluxServer) {
+                mfluxServerInput.value = savedMfluxServer;
+            }
+
+            var mfluxendpoint = mfluxServerInput.value;
+
+            // Update mfluxendpoint when the input value changes
+            mfluxServerInput.addEventListener('input', function() {
+                mfluxendpoint = mfluxServerInput.value;
+                localStorage.setItem('mflux-server', mfluxendpoint);
+            });
+
+            // Handle form submission
+            var form = document.getElementById('generate-form');
+            form.addEventListener('submit', function(event) {
+                event.preventDefault();
+                generateImages();
+            });
+
+            function generateImages() {
+                // Update mfluxendpoint in case it was changed
+                mfluxendpoint = mfluxServerInput.value;
+
+                // Collect input values
+                var prompt = document.getElementById('prompt').value;
+                var width = parseInt(document.getElementById('width').value);
+                var height = parseInt(document.getElementById('height').value);
+                var steps = parseInt(document.getElementById('steps').value);
+                var seed = document.getElementById('seed').value;
+                var quality = parseInt(document.getElementById('quality').value);
+                var count = parseInt(document.getElementById('count').value);
+
+                var dataTemplate = {
+                    "prompt": prompt,
+                    "height": height,
+                    "width": width,
+                    "steps": steps,
+                    "guidance": 3.5,
+                    "format": "JPEG",
+                    "quality": quality,
+                    "priority": false
+                };
+
+                var statusTextArea = document.getElementById('status');
+                var imageContainer = document.getElementById('image-container');
+
+                statusTextArea.value = "Starting image generation...";
+                imageContainer.innerHTML = ''; // Clear previous images
+
+                // Generate timestamp for filenames
+                var timestamp = getFormattedTimestamp();
+
+                var currentIndex = 0;
+
+                function generateNextImage() {
+                    if (currentIndex >= count) {
+                        statusTextArea.value = "All images generated.";
+                        return;
+                    }
+
+                    var data = Object.assign({}, dataTemplate);
+
+                    // If seed is not provided, remove it to get a random seed each time
+                    if (seed === "") {
+                        delete data["seed"];
+                    } else {
+                        data["seed"] = seed;
+                    }
+
+                    var imageNumber = currentIndex + 1;
+                    statusTextArea.value = "Generating image " + imageNumber + " of " + count + "...";
+
+                    // Send POST request to /generate
+                    fetch(mfluxendpoint + '/generate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    })
+                    .then(function(response) {
+                        if (!response.ok) {
+                            throw new Error('Failed to start image generation.');
+                        }
+                        return response.json();
+                    })
+                    .then(function(jsonResp) {
+                        var task_id = jsonResp["task_id"];
+                        var expected_time = jsonResp["expected_time_seconds"];
+                        statusTextArea.value = "Task " + imageNumber + " started. Expected time: " + expected_time.toFixed(1) + " seconds.";
+                        // Start polling for status
+                        pollStatus(task_id, imageNumber);
+                    })
+                    .catch(function(error) {
+                        statusTextArea.value = error.message;
+                    });
+                }
+
+                function pollStatus(task_id, imageNumber) {
+                    var pollInterval = setInterval(function() {
+                        fetch(mfluxendpoint + '/status?task_id=' + task_id)
+                        .then(function(response) {
+                            if (!response.ok) {
+                                throw new Error('Failed to get status.');
+                            }
+                            return response.json();
+                        })
+                        .then(function(statusJson) {
+                            var status = statusJson["status"];
+                            if (status === "done") {
+                                clearInterval(pollInterval);
+                                // Get the image
+                                fetch(mfluxendpoint + '/image?task_id=' + task_id + '&base64=false&delete=true')
+                                .then(function(imageResp) {
+                                    if (!imageResp.ok) {
+                                        throw new Error('Failed to retrieve image.');
+                                    }
+                                    return imageResp.blob();
+                                })
+                                .then(function(imageBlob) {
+                                    var imageUrl = URL.createObjectURL(imageBlob);
+                                    var imgWrapper = createImageElement(imageUrl, imageNumber, timestamp);
+                                    imageContainer.appendChild(imgWrapper);
+                                    statusTextArea.value = "Image " + imageNumber + " of " + count + " generated.";
+                                    currentIndex++;
+                                    // Generate next image
+                                    generateNextImage();
+                                })
+                                .catch(function(error) {
+                                    statusTextArea.value = error.message;
+                                });
+                            } else {
+                                var wait_remaining = statusJson["wait_remaining"] || 1;
+                                var pos = statusJson["pos"] || 0;
+                                var statusText = "Generating image " + imageNumber + " of " + count + ": Status: " + status + ", Position in queue: " + pos + ", Estimated wait time: " + wait_remaining.toFixed(1) + " seconds.";
+                                statusTextArea.value = statusText;
+                            }
+                        })
+                        .catch(function(error) {
+                            clearInterval(pollInterval);
+                            statusTextArea.value = error.message;
+                        });
+                    }, 1000); // Poll every 1 second
+                }
+
+                function createImageElement(imageUrl, imageNumber, timestamp) {
+                    var imageWrapper = document.createElement('div');
+                    imageWrapper.className = 'image-wrapper';
+
+                    var img = document.createElement('img');
+                    img.src = imageUrl;
+                    img.alt = "Generated Image";
+
+                    // Add click event to open image in new tab
+                    img.addEventListener('click', function() {
+                        window.open(imageUrl, '_blank');
+                    });
+
+                    // Create download button
+                    var downloadButton = document.createElement('button');
+                    downloadButton.textContent = 'Download';
+                    downloadButton.className = 'download-button';
+
+                    // Generate filename with timestamp
+                    var filename = 'flux-' + timestamp + '-' + imageNumber + '.jpg';
+
+                    // Add click event to download the image
+                    downloadButton.addEventListener('click', function(e) {
+                        e.stopPropagation(); // Prevent triggering img click event
+                        var a = document.createElement('a');
+                        a.href = imageUrl;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                    });
+
+                    // Append img and downloadButton to imageWrapper
+                    imageWrapper.appendChild(img);
+                    imageWrapper.appendChild(downloadButton);
+
+                    return imageWrapper;
+                }
+
+                function getFormattedTimestamp() {
+                    var now = new Date();
+                    var year = now.getFullYear();
+                    var month = String(now.getMonth() + 1).padStart(2, '0');
+                    var day = String(now.getDate()).padStart(2, '0');
+                    var hour = String(now.getHours()).padStart(2, '0');
+                    var minute = String(now.getMinutes()).padStart(2, '0');
+                    var second = String(now.getSeconds()).padStart(2, '0');
+                    return `${year}-${month}-${day}-${hour}-${minute}-${second}`;
+                }
+
+                // Start generating images
+                generateNextImage();
+            }
+        });
+    </script>
+</body>
+</html>
