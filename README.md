@@ -4,7 +4,7 @@ This API server is designed for asynchronous image generation tasks with mflux. 
 
 ## Examples
 
-Here are two different client applications that use the server API. The first one is the default web-frontent which is available at `http://localhost:4030`
+Here are two different client applications that use the server API. The first one is the default web-frontend which is available at `http://localhost:4030`
 
 ![Screenshot of mflux Image Generator Web Front-end](clients/web-ui/screenshot.png)
 
@@ -160,3 +160,16 @@ def generate_image(mfluxendpoint, prompt, width=1280, height=720, steps=4):
     image = Image.open(BytesIO(imageb))
     return image
 ```
+
+## License
+
+The code is licensed under the Apache 2.0 license.
+
+## Contribution and Contact
+
+Pull requests to enhance the code are welcome!
+
+If you want to share your experience with mflux-server on social media, please notify me under one of the following addresses:
+
+- Mastodon: `@orbiterlab@sigmoid.social`
+- X: `@orbiterlab`
