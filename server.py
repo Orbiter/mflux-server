@@ -1,5 +1,6 @@
-# Server for image generation with mflux
-# This class (C) 2024 by @orbiter Michael Peter Christen
+# mflux-server
+# Server for image generation with mflux (https://github.com/filipstrand/mflux)
+# (C) 2024 by @orbiter Michael Peter Christen
 # This code is licensed under the Apache License, Version 2.0
 
 import os

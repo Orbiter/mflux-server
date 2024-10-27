@@ -1,3 +1,8 @@
+# mflux-gradio-ui
+# Gradio UI Server for the mflux-server
+# (C) 2024 by @orbiter Michael Peter Christen
+# This code is licensed under the Apache License, Version 2.0
+
 import time
 import requests
 import argparse
