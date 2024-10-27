@@ -5,12 +5,13 @@
 
 import os
 import io
-import sys
+import gc
 import argparse
 import time
 import base64
 import hashlib
 import threading
+import mlx.core.metal as metal
 from PIL import Image
 from flask import Flask, request, Response, jsonify
 from flask_restx import Api, Resource, fields
@@ -39,6 +40,7 @@ tasklist = []         # list which holds the image computation tasks
 flux = None           # the flux object, initialized in main()
 pixels = 1024 * 1024  # the number of pixels in all of the computed images (start value)
 ctime = 80            # the total computation time for all images in seconds (start value)
+metal_cache_limit = 0 # the cache limit for the metal library
 apppath = os.path.dirname(__file__)
 
 # we implement image generation as asynchronous task
@@ -59,6 +61,7 @@ def compute_image_task():
             compute_time = time.time()
             task['compute_time'] = compute_time
             # generate the image
+            metal.set_cache_limit(metal_cache_limit)
             generated_image = flux.generate_image(
                 seed=task['seed'],
                 prompt=task['prompt'],
@@ -69,26 +72,32 @@ def compute_image_task():
                     guidance=task['guidance'] or 3.5,
                 )
             )
-            image = generated_image.image # PIL.Image.Image
             end_time = time.time()
             ctime += end_time - compute_time
             pixels += task['height'] * task['width']
             
             # convert the image (we do not count this on the computation time on purpose)
             # we do this here and not during retrieval to save memory in the tasklist
-            format = task['format'].upper()
+            format = task.get('format', 'JPEG').upper()
             if format not in ['PNG', 'JPEG']: format = 'JPEG'
             if format == 'PNG':
                 png_image = io.BytesIO()
-                image.save(png_image, format='PNG')
+                generated_image.image.save(png_image, format='PNG')
                 png_image.seek(0)
                 task['image'] = png_image
+                del png_image
             else:
                 quality = task['quality']
                 jpeg_image = io.BytesIO()
-                image.save(jpeg_image, format='JPEG', quality=quality)
+                generated_image.image.save(jpeg_image, format='JPEG', quality=quality)
                 jpeg_image.seek(0)
                 task['image'] = jpeg_image
+                del jpeg_image
+                
+            # Free resources
+            del generated_image
+            metal.clear_cache()
+            gc.collect()
             
             task['end_time'] = end_time # end time of the task
             foundimage = True
@@ -263,7 +272,9 @@ class GetImage(Resource):
                     format = task['format']
                     base64p = str_to_bool(request.args.get('base64', default='false'))
                     deletep = str_to_bool(request.args.get('delete', default='true'))
-                    if deletep: tasklist.remove(task)
+                    if deletep: 
+                        tasklist.remove(task)
+                        gc.collect()
                     if base64p:
                         return Response(base64.b64encode(image.getvalue()), mimetype='text/plain; charset=utf-8')
                     else:
@@ -354,6 +365,7 @@ def main():
     parser.add_argument('--path', type=str, default=None, help='Local path for loading a model from disk')
     parser.add_argument('--host', type=str, default='127.0.0.1', help='The host to listen on')
     parser.add_argument('--port', type=int, default=4030, help='The port to listen on')
+    parser.add_argument('--cache_limit', type=int, default=0, help='The metal cache limit in bytes')
     args = parser.parse_args()
 
     if args.path and args.model is None:
@@ -365,6 +377,7 @@ def main():
         quantize=args.quantize
     )
 
+    metal_cache_limit = args.cache_limit
     threading.Thread(target=compute_image_task).start()
     print(f"Server started, view swagger API documentation at http://{args.host}:{args.port}/swagger")
     app.run(host=args.host, port=args.port)
