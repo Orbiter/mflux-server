@@ -1,6 +1,20 @@
 # API Server for mflux
 
-This API server is designed for asynchronous image generation tasks, particularly optimized for environments where GPU resources need to be shared across multiple tasks, such as in generative AI chat programs. This server ensures that only one image generation task runs at a time to efficiently use GPU resources.
+This API server is designed for asynchronous image generation tasks with mflux. It is particularly optimized for environments where GPU resources need to be shared across multiple tasks, such as in generative AI chat programs. This server ensures that only one image generation task runs at a time to efficiently use GPU resources. We also add a default user interface to provide a multi-image generation front-end.
+
+## Examples
+
+Here are two different client applications that use the server API. The first one is the default web-frontent which is available at `http://localhost:4030`
+
+![Screenshot of mflux Image Generator Web Front-end](clients/web-ui/screenshot.png)
+
+The second screenshot shows the Gradio Front-End:
+
+![Screenshot of mflux Image Generator Gradio Front-end](clients/gradio-ui/screenshot.png)
+
+Code for both client applications is located in the `clients` subdirectory.
+
+## Features
 
 The API supports features such as:
 - Queuing of image generation tasks.
@@ -16,7 +30,7 @@ The server can be started with i.e.
 python3 server.py --quantize 8
 ```
 
-It then runs on port 4030 by default. Host an port can be configured by call parameters, try `server.py --help`. To see the swagger documentation, open http://localhost:4030/swagger
+It then runs on port 4030 by default. Host an port can be configured by call parameters, try `server.py --help`. To see the swagger documentation, open `http://localhost:4030/swagger`
 
 To produce an image, the usual workflow is:
 - `/api/generate` to initialize the generation, this returns a `task_id`
