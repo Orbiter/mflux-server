@@ -11,7 +11,7 @@
     <title>FLUX Image Generation</title>
     <style>
         /* lit.css content with adjustments */
-        *{box-sizing:border-box}*+*{margin:.3em 0}pre{overflow:auto}@media(min-width:35em){.col{display:table-cell}.\31{width:5%}.\32{width:15%}.\33{width:22%}.\34{width:30%}.\35{width:40%}.\36{width:50%}.\38{width:84%}.row{display:table;border-spacing:.5em 0}}.row,.w-100{width:100%}.card:focus,hr{outline:0;border:solid #fa0}.card,pre{padding:.5em;border:solid #eee}.btn:hover,a:hover{opacity:.6}.c{padding:.5em;margin:auto;font:1em/1.4 sans-serif}a{color:#fa0;text-decoration:none}.btn.primary{color:#000;background:#fa0;border:none}td,th{padding:.5em;text-align:left;border-bottom:solid #eee}.btn{padding:.5em;background:#fa0;color:#000;border:none;font:.7em sans-serif}
+        *{box-sizing:border-box}*+*{margin:.3em 0}pre{overflow:auto}@media(min-width:35em){.col{display:table-cell}.\31{width:5%}.\32{width:15%}.\33{width:22%}.\34{width:30%}.\35{width:40%}.\36{width:50%}.\37{width:68%}.\38{width:84%}.row{display:table;border-spacing:.5em 0}}.row,.w-100{width:100%}.card:focus,hr{outline:0;border:solid #fa0}.card,pre{padding:.5em;border:solid #eee}.btn:hover,a:hover{opacity:.6}.c{padding:.5em;margin:auto;font:1em/1.4 sans-serif}a{color:#fa0;text-decoration:none}.btn.primary{color:#000;background:#fa0;border:none}td,th{padding:.5em;text-align:left;border-bottom:solid #eee}.btn{padding:.5em;background:#fa0;color:#000;border:none;font:.7em sans-serif}
         /* Font settings: one sans-serif font, no bold */
         body, .c, h1, h2, h3, h4, h5, h6, label, input, textarea, button {
             font-family: sans-serif;
@@ -209,12 +209,20 @@
             <form id="generate-form">
                 <!-- First Line: Prompt and mflux-server -->
                 <div class="row">
-                    <div class="col 8">
+                    <div class="col 7">
                         <div class="input-group">
                             <label class="input-label" for="prompt">Prompt:</label>
                             <textarea id="prompt" name="prompt" rows="3"></textarea>
                         </div>
                     </div>
+                    <div class="col 2">
+                        <div class="input-group">
+                            <label class="btn" for="init-image">Upload Init Image</label>
+                            <input type="file" id="init-image" accept="image/*" style="display: none;">
+                            <button type="button" id="delete-init-image-button" class="btn">Delete Image</button>
+                            <div id="init-image-name"></div>
+                        </div>
+                    </div>                    
                     <div class="col 2">
                         <div class="input-group">
                             <label class="input-label" for="mflux-server">mflux-server:</label>
@@ -293,10 +301,29 @@
         const widthValues  = [256, 320, 512, 640, 768, 800, 1024, 1280, 1920, 2048, 2560];
         const heightValues = [200, 240, 256, 360, 480, 512, 576, 600, 720, 768, 800, 960, 1024, 1080, 1200, 1440, 1600, 2048, 2560];
         const acceptedAspectRatio = ["1:1", "5:4", "4:3", "3:2", "14:9", "16:10", "5:3", "16:9", "2:1"];
+        var initImageFile = null;  // To store the selected image file
 
         document.addEventListener('DOMContentLoaded', function() {
 
-            // handle mfluxendpoint
+            // Handle init-image upload
+            document.getElementById('init-image').addEventListener('click', function() {
+                var fileInput = document.getElementById('init-image');
+                fileInput.value = ''; // Clear previous file selection
+                fileInput.click();
+            });
+
+            document.getElementById('init-image').addEventListener('change', function(event) {
+                initImageFile = event.target.files[0];
+                document.getElementById('init-image-name').textContent = initImageFile ? initImageFile.name : "No file chosen";
+            });
+            
+            document.getElementById('delete-init-image-button').addEventListener('click', function () {
+                initImageFile = null; // Clear the selected file
+                document.getElementById('init-image').value = ''; // Reset file input
+                document.getElementById('init-image-name').textContent = "No file chosen"; // Update UI
+                console.log('Init image deleted');
+            });
+                    // handle mfluxendpoint
             var mfluxServerInput = document.getElementById('mflux-server');
 
             // Load saved mflux-server value from localStorage
@@ -397,7 +424,8 @@
                     "guidance": 3.5,
                     "format": "JPEG",
                     "quality": quality,
-                    "priority": false
+                    "priority": false,
+                    "init_image": null
                 };
 
                 var statusTextArea = document.getElementById('status');
@@ -408,8 +436,27 @@
 
                 // Generate timestamp for filenames
                 var timestamp = getFormattedTimestamp();
-
                 var currentIndex = 0;
+
+                // Include init_image in data if a file was selected
+                if (initImageFile) {
+                    const loadImageAsBase64 = (file) => {
+                        return new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result.split(',')[1]); // Extract the Base64 part
+                            reader.onerror = () => reject(reader.error);
+                            reader.readAsDataURL(file);
+                        });
+                    };
+                    loadImageAsBase64(initImageFile).then(base64Image => {
+                        dataTemplate["init_image"] = base64Image;
+                        generateNextImage();
+                    }).catch(error => {
+                        console.error("Error reading file:", error);
+                    });
+                } else {
+                    generateNextImage();
+                }
 
                 function generateNextImage() {
                     if (currentIndex >= count) {
@@ -426,6 +473,7 @@
                         data["seed"] = seed;
                     }
 
+                    var body = JSON.stringify(data);
                     var imageNumber = currentIndex + 1;
                     statusTextArea.value = "Generating image " + imageNumber + " of " + count + "...";
 
@@ -435,7 +483,7 @@
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify(data)
+                        body: body
                     })
                     .then(function(response) {
                         if (!response.ok) {
@@ -551,9 +599,6 @@
                     var second = String(now.getSeconds()).padStart(2, '0');
                     return `${year}-${month}-${day}-${hour}-${minute}-${second}`;
                 }
-
-                // Start generating images
-                generateNextImage();
             }
         });
     </script>

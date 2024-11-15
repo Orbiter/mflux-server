@@ -62,6 +62,15 @@ def compute_image_task():
             task['compute_time'] = compute_time
             # generate the image
             metal.set_cache_limit(metal_cache_limit)
+            init_image = task['init_image']
+            
+            # make a temporary file path for the init_image
+            if init_image:
+                init_image_path = f"/tmp/init_image_{task['task_id']}.png"
+                init_image.save(init_image_path)
+            else:
+                init_image_path = None
+            
             generated_image = flux.generate_image(
                 seed=task['seed'],
                 prompt=task['prompt'],
@@ -70,8 +79,15 @@ def compute_image_task():
                     height=task['height'],
                     width=task['width'],
                     guidance=task['guidance'] or 3.5,
+                    init_image_path=init_image_path,
+                    init_image_strength=0.4
                 )
             )
+
+            # remove the temporary init_image file
+            if init_image_path: os.remove(init_image_path)
+
+            # statistics
             end_time = time.time()
             ctime += end_time - compute_time
             pixels += task['height'] * task['width']
@@ -167,6 +183,17 @@ class GenerateImage(Resource):
         quality = args.get('quality', 85)
         priority = args.get('priority', False)
 
+        # Decode init_image if it is provided
+        init_image = None
+        if 'init_image' in args:
+            try:
+                init_image_data = base64.b64decode(args['init_image'])
+                init_image = Image.open(io.BytesIO(init_image_data))
+                # log properties of the init_image, width, height, mode
+                print("init_image", init_image.size, init_image.mode)
+            except Exception as e:
+                pass # ignore errors
+            
         start_time = time.time()
         # taskid is a 8-digit hex hash to identify the image
         md5 = hashlib.md5()
@@ -184,7 +211,8 @@ class GenerateImage(Resource):
             'format': format,
             'quality': quality,
             'priority': priority,
-            'start_time': start_time
+            'start_time': start_time,
+            'init_image': init_image
         }
         
         # compute waiting time based on the number of pixels in the queue
