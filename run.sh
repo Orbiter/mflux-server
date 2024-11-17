@@ -6,7 +6,6 @@ cd "$(dirname "$0")"
 # check the local environment for python3
 python3 --version
 pip3 --version
-python3 -m venv --version
 
 # Check if virtual environment exists
 if [ ! -d ".venv" ]; then
