@@ -1,6 +1,6 @@
 # API Server for mflux
 
-This API server is designed for asynchronous image generation tasks with mflux. It is particularly optimized for environments where GPU resources need to be shared across multiple tasks, such as in generative AI chat programs. This server ensures that only one image generation task runs at a time to efficiently use GPU resources. We also add a default user interface to provide a multi-image generation front-end.
+This API server is designed for asynchronous image generation tasks with [mflux](https://github.com/filipstrand/mflux). It is particularly optimized for environments where GPU resources need to be shared across multiple tasks, such as in generative AI chat programs. This server ensures that only one image generation task runs at a time to efficiently use GPU resources. We also add a default user interface to provide a multi-image generation front-end.
 
 ## Examples
 
@@ -25,6 +25,10 @@ Furthermore, the API exposes a swagger endpoint to self-document the server.
 
 ## Example usage
 
+You need a huggingface access token to get the weights from the gated huggingface repository.
+Create a token and then install the huggingface CLI with `pip install huggingface_hub`,
+then log in with `huggingface-cli login` and paste in your access token.
+
 The server can be installed and started with i.e.
 ```
 python3 -m venv .venv
@@ -33,7 +37,10 @@ pip3 install -r requirements.txt
 python3 server.py --quantize 8 --host 0.0.0.0
 ```
 
-It then runs on port 4030 by default. Host an port can be configured by call parameters, try `server.py --help`. To see the swagger documentation, open `http://localhost:4030/swagger`
+As a convenience script, you can instead just run `run.sh` which does all of that automatically.
+
+The server then runs on port 4030 by default. Host and port can be configured by call parameters, try `server.py --help`.
+To see the swagger documentation, open `http://localhost:4030/swagger`
 
 To produce an image, the usual workflow is:
 - `/api/generate` to initialize the generation, this returns a `task_id`

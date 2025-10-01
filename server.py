@@ -11,12 +11,16 @@ import time
 import base64
 import hashlib
 import threading
-import mlx.core.metal as metal
+import mlx.core as mx
+from mlx.core import metal as metal_compat
 from PIL import Image
+from pathlib import Path
 from flask import Flask, request, Response, jsonify
 from flask_restx import Api, Resource, fields
 from flask_cors import CORS
-from mflux import Flux1, Config, ModelConfig, ImageUtil
+from mflux.config.config import Config
+from mflux.config.model_config import ModelConfig
+from mflux.flux.flux import Flux1
 from flask import send_file, redirect
 
 import requests
@@ -45,6 +49,20 @@ apppath = os.path.dirname(__file__)
 
 # we implement image generation as asynchronous task
 # this will be executed in a separate thread
+def _set_mlx_cache_limit(limit: int) -> None:
+    try:
+        mx.set_cache_limit(limit)
+    except AttributeError:
+        metal_compat.set_cache_limit(limit)
+
+
+def _clear_mlx_cache() -> None:
+    try:
+        mx.clear_cache()
+    except AttributeError:
+        metal_compat.clear_cache()
+
+
 def compute_image_task():
     global flux, tasklist, pixels, ctime
     # we loop forever and in every iteration we check if there is a task to process
@@ -61,13 +79,13 @@ def compute_image_task():
             compute_time = time.time()
             task['compute_time'] = compute_time
             # generate the image
-            metal.set_cache_limit(metal_cache_limit)
+            _set_mlx_cache_limit(metal_cache_limit)
             init_image = task['init_image']
             
             # make a temporary file path for the init_image
             if init_image:
-                init_image_path = f"/tmp/init_image_{task['task_id']}.png"
-                init_image.save(init_image_path)
+                init_image_path = Path(f"/tmp/init_image_{task['task_id']}.png")
+                init_image.save(str(init_image_path))
             else:
                 init_image_path = None
             
@@ -79,8 +97,8 @@ def compute_image_task():
                     height=task['height'],
                     width=task['width'],
                     guidance=task['guidance'] or 3.5,
-                    init_image_path=init_image_path,
-                    init_image_strength=0.4
+                    image_path=init_image_path,
+                    image_strength=0.4 if init_image_path else None
                 )
             )
 
@@ -112,7 +130,7 @@ def compute_image_task():
                 
             # Free resources
             del generated_image
-            metal.clear_cache()
+            _clear_mlx_cache()
             gc.collect()
             
             task['end_time'] = end_time # end time of the task
@@ -400,9 +418,12 @@ def main():
         parser.error("--model must be specified when using --path")
 
     global flux
-    flux = Flux1.from_alias(
-        alias=args.model,
-        quantize=args.quantize
+    global metal_cache_limit
+    model_config = ModelConfig.from_name(model_name=args.model)
+    flux = Flux1(
+        model_config=model_config,
+        quantize=args.quantize,
+        local_path=args.path,
     )
 
     metal_cache_limit = args.cache_limit
