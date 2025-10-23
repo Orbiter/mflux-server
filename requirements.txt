@@ -1,6 +1,6 @@
-mflux>=0.10.0
+mflux>=0.11.0
 flask
 flask-restx
 flask-cors
 protobuf>=4.25.0
-mlx>=0.27.0,<0.28.0
+mlx>=0.27.0,<0.30.0

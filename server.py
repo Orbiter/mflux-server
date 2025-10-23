@@ -18,10 +18,10 @@ from pathlib import Path
 from flask import Flask, request, Response, jsonify
 from flask_restx import Api, Resource, fields
 from flask_cors import CORS
+from flask import send_file, redirect
 from mflux.config.config import Config
 from mflux.config.model_config import ModelConfig
-from mflux.flux.flux import Flux1
-from flask import send_file, redirect
+from mflux.models.flux.variants.txt2img.flux import Flux1
 
 import requests
 
@@ -45,6 +45,7 @@ flux = None           # the flux object, initialized in main()
 pixels = 1024 * 1024  # the number of pixels in all of the computed images (start value)
 ctime = 80            # the total computation time for all images in seconds (start value)
 metal_cache_limit = 0 # the cache limit for the metal library
+model = "schnell"     # default model
 apppath = os.path.dirname(__file__)
 
 # we implement image generation as asynchronous task
@@ -93,7 +94,7 @@ def compute_image_task():
                 seed=task['seed'],
                 prompt=task['prompt'],
                 config=Config(
-                    num_inference_steps=task['steps'] or 4,
+                    num_inference_steps=task['steps'] or (4 if model == "schnell" else 25),
                     height=task['height'],
                     width=task['width'],
                     guidance=task['guidance'] or 3.5,
@@ -151,7 +152,7 @@ task_model = api.model('TaskInput', {
     'seed': fields.String(description='Entropy Seed', default=str(int(time.time())), required=False),
     'height': fields.Integer(description='Image height', default=1024, required=False),
     'width': fields.Integer(description='Image width', default=1024, required=False),
-    'steps': fields.Integer(description='Inference Steps', default=4, required=False),
+    'steps': fields.Integer(description='Inference Steps', default=(4 if model == "schnell" else 25), required=False),
     'guidance': fields.Float(description='Guidance Scale', default=3.5, required=False),
     'format': fields.String(description='The image format (JPEG or PNG), default is JPEG', default="JPEG", required=False),
     'quality': fields.Integer(description='JPEG compression quality (1-100) if format is JPEG, default is 85', default=85, required=False),
@@ -195,7 +196,7 @@ class GenerateImage(Resource):
         seed = args.get('seed', str(int(time.time())))
         height = int(args.get('height', 1024))
         width = int(args.get('width', 1024))
-        steps = int(args.get('steps', 4))
+        steps = int(args.get('steps', (4 if model == "schnell" else 25)))
         guidance = float(args.get('guidance', 3.5))
         format = args.get('format', 'JPEG').upper()
         quality = args.get('quality', 85)
@@ -406,27 +407,19 @@ def serve_index():
 
 def main():
     parser = argparse.ArgumentParser(description='Start a server to generate images with mflux.')
-    parser.add_argument('--model', "-m", type=str, default="schnell", choices=["dev", "schnell"], help='The model to use ("schnell" or "dev").')
+    parser.add_argument('--model', "-m", type=str, default="schnell", choices=["dev", "schnell", "krea-dev", "qwen"], help='The model to use ("schnell" or "dev").')
     parser.add_argument('--quantize',  "-q", type=int, choices=[4, 8], default=None, help='Quantize the model (4 or 8, Default is None)')
-    parser.add_argument('--path', type=str, default=None, help='Local path for loading a model from disk')
     parser.add_argument('--host', type=str, default='127.0.0.1', help='The host to listen on')
     parser.add_argument('--port', type=int, default=4030, help='The port to listen on')
     parser.add_argument('--cache_limit', type=int, default=0, help='The metal cache limit in bytes')
     args = parser.parse_args()
 
-    if args.path and args.model is None:
-        parser.error("--model must be specified when using --path")
-
     global flux
     global metal_cache_limit
-    model_config = ModelConfig.from_name(model_name=args.model)
-    flux = Flux1(
-        model_config=model_config,
-        quantize=args.quantize,
-        local_path=args.path,
-    )
+    flux = Flux1.from_name(quantize=args.quantize, model_name=args.model)
 
     metal_cache_limit = args.cache_limit
+    model = args.model
     threading.Thread(target=compute_image_task).start()
     print(f"Server started, view swagger API documentation at http://{args.host}:{args.port}/swagger")
     app.run(host=args.host, port=args.port)
