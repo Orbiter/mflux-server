@@ -6,10 +6,11 @@
 import os
 import io
 import gc
-import argparse
+import json
 import time
 import base64
 import hashlib
+import argparse
 import threading
 import mlx.core as mx
 from mlx.core import metal as metal_compat
@@ -19,9 +20,10 @@ from flask import Flask, request, Response, jsonify
 from flask_restx import Api, Resource, fields
 from flask_cors import CORS
 from flask import send_file, redirect
-from mflux.config.config import Config
-from mflux.config.model_config import ModelConfig
 from mflux.models.flux.variants.txt2img.flux import Flux1
+from mflux.models.qwen.variants.txt2img.qwen_image import QwenImage
+from mflux.models.fibo.variants.txt2img.fibo import FIBO
+from mflux.models.z_image.variants.turbo.z_image_turbo import ZImageTurbo
 
 import requests
 
@@ -40,13 +42,80 @@ api = Api(app, version='1.0', title='MFLUX API Server',
 
 CORS(app, resources={r"/*": {"origins": "*"}})
 
+apppath = os.path.dirname(__file__)
 tasklist = []         # list which holds the image computation tasks
-flux = None           # the flux object, initialized in main()
+model_instance = None # the model object, initialized in main()
 pixels = 1024 * 1024  # the number of pixels in all of the computed images (start value)
 ctime = 80            # the total computation time for all images in seconds (start value)
 metal_cache_limit = 0 # the cache limit for the metal library
-model = "schnell"     # default model
-apppath = os.path.dirname(__file__)
+model = "dhairyashil/FLUX.1-schnell-mflux-v0.6.2-4bit" # default model
+model_quantize = None # quantization level in use
+model_lock = threading.Lock()
+MODEL_REGISTRY = {
+    "dev": {"loader": "flux", "steps": 25},
+    "dhairyashil/FLUX.1-dev-mflux-4bit": {"loader": "flux", "steps": 25},
+    "schnell": {"loader": "flux", "steps": 4},
+    "dhairyashil/FLUX.1-schnell-mflux-v0.6.2-4bit": {"loader": "flux", "steps": 4},
+    "krea-dev": {"loader": "flux", "steps": 25},
+    "filipstrand/FLUX.1-Krea-dev-mflux-4bit": {"loader": "flux", "steps": 25},
+    "qwen": {"loader": "qwen", "steps": 25},
+    "filipstrand/Qwen-Image-mflux-6bit": {"loader": "qwen", "steps": 25, "quantize": 6},
+    "fibo": {"loader": "fibo", "steps": 25},
+    "briaai/Fibo-mlx-4bit": {"loader": "fibo", "steps": 25},
+    "briaai/Fibo-mlx-8bit": {"loader": "fibo", "steps": 25},
+    "z-image-turbo": {"loader": "z-image", "steps": 9},
+    "filipstrand/Z-Image-Turbo-mflux-4bit": {"loader": "z-image", "steps": 9}
+}
+
+def load_model(model_name: str, quantize: int | None):
+    info = MODEL_REGISTRY.get(model_name, {})
+    loader = info.get("loader")
+    effective_quantize = quantize if quantize is not None else info.get("quantize")
+    model_path = model_name if "/" in model_name else None
+    if loader == "flux":
+        return Flux1.from_name(quantize=effective_quantize, model_name=model_name)
+    if loader == "qwen":
+        return QwenImage(quantize=effective_quantize, model_path=model_path)
+    if loader == "fibo":
+        return FIBO(quantize=effective_quantize, model_path=model_path)
+    if loader == "z-image":
+        return ZImageTurbo(quantize=effective_quantize, model_path=model_path)
+    raise ValueError(f"Unknown model loader for '{model_name}'")
+
+def generate_with_model(instance, model_name: str, task, init_image_path):
+    info = MODEL_REGISTRY.get(model_name, {})
+    steps = task['steps'] or MODEL_REGISTRY.get(model_name, {}).get("steps", 4)
+    guidance = task['guidance'] or 3.5
+    prompt = task['prompt']
+    if info.get("loader") == "fibo":
+        try:
+            json.loads(prompt)
+        except json.JSONDecodeError:
+            prompt = json.dumps({"prompt": prompt})
+    common_kwargs = {
+        "seed": task['seed'],
+        "prompt": prompt,
+        "num_inference_steps": steps,
+        "height": task['height'],
+        "width": task['width'],
+        "image_path": init_image_path,
+        "image_strength": 0.4 if init_image_path else None
+    }
+    if info.get("loader") == "z-image":
+        return instance.generate_image(**common_kwargs)
+    return instance.generate_image(**common_kwargs, guidance=guidance)
+
+def load_model_runtime(model_name: str, quantize: int | None):
+    global model_instance, model, model_quantize
+    if model_name not in MODEL_REGISTRY:
+        raise ValueError(f"Unknown model '{model_name}'")
+    info = MODEL_REGISTRY.get(model_name, {})
+    effective_quantize = quantize if quantize is not None else info.get("quantize")
+    loaded_instance = load_model(model_name, effective_quantize)
+    with model_lock:
+        model = model_name
+        model_quantize = effective_quantize
+        model_instance = loaded_instance
 
 # we implement image generation as asynchronous task
 # this will be executed in a separate thread
@@ -65,10 +134,13 @@ def _clear_mlx_cache() -> None:
 
 
 def compute_image_task():
-    global flux, tasklist, pixels, ctime
+    global model_instance, tasklist, pixels, ctime
     # we loop forever and in every iteration we check if there is a task to process
     while True:
-        if flux == None or len(tasklist) == 0:
+        with model_lock:
+            current_model_instance = model_instance
+            current_model_name = model
+        if current_model_instance == None or len(tasklist) == 0:
             time.sleep(1)
             continue
         
@@ -89,19 +161,8 @@ def compute_image_task():
                 init_image.save(str(init_image_path))
             else:
                 init_image_path = None
-            
-            generated_image = flux.generate_image(
-                seed=task['seed'],
-                prompt=task['prompt'],
-                config=Config(
-                    num_inference_steps=task['steps'] or (4 if model == "schnell" else 25),
-                    height=task['height'],
-                    width=task['width'],
-                    guidance=task['guidance'] or 3.5,
-                    image_path=init_image_path,
-                    image_strength=0.4 if init_image_path else None
-                )
-            )
+
+            generated_image = generate_with_model(current_model_instance, current_model_name, task, init_image_path)
 
             # remove the temporary init_image file
             if init_image_path: os.remove(init_image_path)
@@ -152,7 +213,7 @@ task_model = api.model('TaskInput', {
     'seed': fields.String(description='Entropy Seed', default=str(int(time.time())), required=False),
     'height': fields.Integer(description='Image height', default=1024, required=False),
     'width': fields.Integer(description='Image width', default=1024, required=False),
-    'steps': fields.Integer(description='Inference Steps', default=(4 if model == "schnell" else 25), required=False),
+    'steps': fields.Integer(description='Inference Steps', default=MODEL_REGISTRY.get(model, {}).get("steps", 4), required=False),
     'guidance': fields.Float(description='Guidance Scale', default=3.5, required=False),
     'format': fields.String(description='The image format (JPEG or PNG), default is JPEG', default="JPEG", required=False),
     'quality': fields.Integer(description='JPEG compression quality (1-100) if format is JPEG, default is 85', default=85, required=False),
@@ -176,6 +237,54 @@ def count_pixels(index):
             pixels += task['width'] * task['height']
     return pixels
 
+@api.route('/ls')
+class ListModels(Resource):
+    @api.response(200, 'Success')
+    def get(self):
+        """
+        The /ls endpoint provides a catalog of available models and defaults.
+        """
+        return jsonify(MODEL_REGISTRY)
+
+@api.route('/ps')
+class GetSettings(Resource):
+    @api.response(200, 'Success')
+    def get(self):
+        """
+        The /ps endpoint provides the current server settings and default model.
+        """
+        return jsonify({
+            "model": model,
+            "quantize": model_quantize,
+            "cache_limit": metal_cache_limit,
+            "default_steps": MODEL_REGISTRY.get(model, {}).get("steps", 4)
+        })
+
+@api.route('/load')
+class LoadModel(Resource):
+    @api.response(200, 'Success')
+    @api.response(400, 'Invalid model')
+    def post(self):
+        """
+        The /load endpoint replaces the currently loaded model.
+        """
+        args = request.json or {}
+        requested_model = args.get('model')
+        if not requested_model:
+            return jsonify({"error": "model is required"}), 400
+        requested_quantize = args.get('quantize', None)
+        try:
+            if requested_quantize is not None:
+                requested_quantize = int(requested_quantize)
+            load_model_runtime(requested_model, requested_quantize)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({
+            "model": model,
+            "quantize": model_quantize,
+            "default_steps": MODEL_REGISTRY.get(model, {}).get("steps", 4)
+        })
+    
 @api.route('/generate')
 class GenerateImage(Resource):
     @api.expect(task_model, validate=True)
@@ -196,7 +305,7 @@ class GenerateImage(Resource):
         seed = args.get('seed', str(int(time.time())))
         height = int(args.get('height', 1024))
         width = int(args.get('width', 1024))
-        steps = int(args.get('steps', (4 if model == "schnell" else 25)))
+        steps = int(args.get('steps', MODEL_REGISTRY.get(model, {}).get("steps", 4)))
         guidance = float(args.get('guidance', 3.5))
         format = args.get('format', 'JPEG').upper()
         quality = args.get('quality', 85)
@@ -250,9 +359,6 @@ class GenerateImage(Resource):
             'expected_time_seconds': expected_time_seconds
         }, 200
 
-
-# status endpoint
-
 status_model = api.model('Status', {
     'status': fields.String(description='Status of the image generation task'),
     'pos': fields.Integer(description='Position in queue')
@@ -290,9 +396,6 @@ class GetStatus(Resource):
                     return jsonify({'status': 'waiting', 'pos': c, 'wait_remaining': wait_remaining})
         return Response(status=404)
 
-
-# image retrieval endpoint; image format was already defined in the generate endpoint
-
 @api.route('/image')
 class GetImage(Resource):
     @api.doc(params={
@@ -328,9 +431,6 @@ class GetImage(Resource):
                         return Response(image.getvalue(), mimetype='image/png' if format == 'PNG' else 'image/jpeg')
         return Response(status=404)
 
-
-# cancel task endpoint
-
 @api.route('/cancel')
 class CancelTask(Resource):
     @api.doc(params={'task_id': 'The ID of the image generation task'})
@@ -346,9 +446,6 @@ class CancelTask(Resource):
                 tasklist.remove(task)
                 return Response(status=200)
         return Response(status=404)
-
-
-# tasks lising endpoint
 
 task_output_model = api.inherit('TaskOutput', task_model, {
     'task_id': fields.String(description='ID of the image generation task', default=None, required=False),
@@ -375,21 +472,12 @@ class GetTasks(Resource):
             tasklist0.append(task0)        
         return jsonify(tasklist0)
 
-
-# clear tasks endpoint
-
 @api.route('/clear')
 class ClearTasks(Resource):
     @api.response(200, 'Success')
     def get(self):
-        """
-        The /clear endpoint is used to clear all tasks.
-        """
         tasklist.clear()
         return Response(status=200)
-
-
-# convenience file endpoints for testing
 
 @app.route('/')
 def redirect_to_index():
@@ -399,27 +487,21 @@ def redirect_to_index():
 def serve_index():
     return send_file(os.path.join(apppath, 'clients/web-ui/index.html'))
 
-#@api.route('/index.html')
-#class Root(Resource):
-#    @api.response(200, 'Success')
-#    def get(self):
-#        return send_file(os.path.join(apppath, 'clients/web-ui/index.html'))   
-
 def main():
     parser = argparse.ArgumentParser(description='Start a server to generate images with mflux.')
-    parser.add_argument('--model', "-m", type=str, default="schnell", choices=["dev", "schnell", "krea-dev", "qwen"], help='The model to use ("schnell" or "dev").')
+    parser.add_argument('--model', type=str, default=model, choices=MODEL_REGISTRY.keys(), help='The model to use (i.e. "schnell" or "dev").')
     parser.add_argument('--quantize',  "-q", type=int, choices=[4, 8], default=None, help='Quantize the model (4 or 8, Default is None)')
     parser.add_argument('--host', type=str, default='127.0.0.1', help='The host to listen on')
     parser.add_argument('--port', type=int, default=4030, help='The port to listen on')
     parser.add_argument('--cache_limit', type=int, default=0, help='The metal cache limit in bytes')
     args = parser.parse_args()
 
-    global flux
+    global model_quantize
+    global model_instance
     global metal_cache_limit
-    flux = Flux1.from_name(quantize=args.quantize, model_name=args.model)
+    load_model_runtime(args.model, args.quantize)
 
     metal_cache_limit = args.cache_limit
-    model = args.model
     threading.Thread(target=compute_image_task).start()
     print(f"Server started, view swagger API documentation at http://{args.host}:{args.port}/swagger")
     app.run(host=args.host, port=args.port)

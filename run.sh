@@ -17,4 +17,4 @@ source .venv/bin/activate
 pip3.12 install --upgrade pip
 pip3.12 install --upgrade -r requirements.txt
 
-python3.12 server.py --quantize 8 --host 0.0.0.0
+python3.12 server.py --host 0.0.0.0

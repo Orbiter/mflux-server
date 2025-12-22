@@ -204,6 +204,9 @@
     <div class="c">
         <h1>FLUX Image Generation</h1>
         ...using the <a href="https://github.com/orbiter/mflux-server">mflux-server</a> (Github <a href="https://github.com/orbiter/mflux-server">https://github.com/orbiter/mflux-server</a>)
+        <div>
+            <select id="model-select"></select>
+        </div>
         <!-- Input Container -->
         <div class="input-container">
             <form id="generate-form">
@@ -395,6 +398,91 @@
                     updateAspectRatio();
                 });
             });
+
+            function applyModelDefaults(settings) {
+                if (!settings) return;
+                if (settings.model) {
+                    var modelSelect = document.getElementById('model-select');
+                    if (modelSelect.value !== settings.model) {
+                        modelSelect.value = settings.model;
+                    }
+                }
+                if (settings.default_steps) {
+                    var stepsInput = document.getElementById('steps');
+                    var stepsValue = document.getElementById('steps-value');
+                    stepsInput.value = settings.default_steps;
+                    stepsValue.textContent = settings.default_steps;
+                    updateSliderBackground(stepsInput);
+                }
+            }
+
+            function loadServerSettings() {
+                fetch(mfluxendpoint + '/api/ps')
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('Failed to load server settings.');
+                    }
+                    return response.json();
+                })
+                .then(function(settings) {
+                    applyModelDefaults(settings);
+                })
+                .catch(function(error) {
+                    console.log(error.message);
+                });
+            }
+
+            function loadModelOptions() {
+                fetch(mfluxendpoint + '/api/ls')
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('Failed to load model list.');
+                    }
+                    return response.json();
+                })
+                .then(function(models) {
+                    var modelSelect = document.getElementById('model-select');
+                    modelSelect.innerHTML = '';
+                    Object.keys(models).forEach(function(name) {
+                        var opt = document.createElement('option');
+                        opt.value = name;
+                        opt.textContent = name;
+                        modelSelect.appendChild(opt);
+                    });
+                    loadServerSettings();
+                })
+                .catch(function(error) {
+                    console.log(error.message);
+                });
+            }
+
+            function loadSelectedModel(modelName) {
+                fetch(mfluxendpoint + '/api/load', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ model: modelName })
+                })
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('Failed to load model.');
+                    }
+                    return response.json();
+                })
+                .then(function(settings) {
+                    applyModelDefaults(settings);
+                })
+                .catch(function(error) {
+                    console.log(error.message);
+                });
+            }
+
+            document.getElementById('model-select').addEventListener('change', function(event) {
+                loadSelectedModel(event.target.value);
+            });
+
+            loadModelOptions();
 
             // Handle form submission
             var form = document.getElementById('generate-form');
