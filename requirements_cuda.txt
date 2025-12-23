@@ -1,0 +1,13 @@
+torch
+diffusers
+transformers
+accelerate
+safetensors
+sentencepiece
+protobuf>=4.25.0
+bitsandbytes
+flask
+flask-restx
+flask-cors
+pillow
+requests

@@ -26,7 +26,7 @@ Furthermore, the API exposes a swagger endpoint to self-document the server.
 ## Example usage
 
 You need a huggingface access token to get the weights from the gated huggingface repository.
-Create a token and then install the huggingface CLI with `pip install huggingface_hub`,
+Create a token and then install the huggingface CLI with `pip install huggingface-hub`,
 then log in with `huggingface-cli login` and paste in your access token.
 
 The server can be installed and started with i.e.
