@@ -1,0 +1,38 @@
+# Virtual environment
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# uv
+uv.lock
+
+# Server runtime files
+*.pid
+*.log
+.mflux-server.pid
+.mflux-server-cuda.pid
+mflux-server.log
+mflux-server-cuda.log

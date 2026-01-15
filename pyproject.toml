@@ -1,0 +1,34 @@
+[project]
+name = "mflux-server"
+version = "1.0.0"
+description = "Image generation server with mflux"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "mflux==0.13.3",
+    "flask",
+    "flask-restx",
+    "flask-cors",
+    "protobuf>=4.25.0",
+    "pillow",
+    "requests",
+]
+
+[project.optional-dependencies]
+mlx = [
+    "mlx>=0.27.0,<0.31.0",
+]
+cuda = [
+    "torch",
+    "diffusers",
+    "transformers",
+    "accelerate",
+    "safetensors",
+    "sentencepiece",
+    "bitsandbytes",
+]
+
+[dependency-groups]
+dev = []
+
+[tool.uv.sources]
+# Configure uv to use system packages when possible for MLX
