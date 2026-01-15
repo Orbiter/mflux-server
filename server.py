@@ -11,6 +11,7 @@ import time
 import base64
 import hashlib
 import argparse
+import sys
 import threading
 import mlx.core as mx
 from mlx.core import metal as metal_compat
@@ -48,14 +49,15 @@ model_instance = None # the model object, initialized in main()
 pixels = 1024 * 1024  # the number of pixels in all of the computed images (start value)
 ctime = 80            # the total computation time for all images in seconds (start value)
 metal_cache_limit = 0 # the cache limit for the metal library
-model = "dhairyashil/FLUX.1-schnell-mflux-v0.6.2-4bit" # default model
+model = "dhairyashil/FLUX.1-schnell-mflux-4bit" # default model
 model_quantize = None # quantization level in use
 model_lock = threading.Lock()
+custom_model_base_path: str | None = None  # Base path for custom model storage
 MODEL_REGISTRY = {
     "dev": {"loader": "flux", "steps": 25},
     "dhairyashil/FLUX.1-dev-mflux-4bit": {"loader": "flux", "steps": 25},
     "schnell": {"loader": "flux", "steps": 4},
-    "dhairyashil/FLUX.1-schnell-mflux-v0.6.2-4bit": {"loader": "flux", "steps": 4},
+    "dhairyashil/FLUX.1-schnell-mflux-4bit": {"loader": "flux", "steps": 4},
     "krea-dev": {"loader": "flux", "steps": 25},
     "filipstrand/FLUX.1-Krea-dev-mflux-4bit": {"loader": "flux", "steps": 25},
     "qwen": {"loader": "qwen", "steps": 25},
@@ -67,11 +69,32 @@ MODEL_REGISTRY = {
     "filipstrand/Z-Image-Turbo-mflux-4bit": {"loader": "z-image", "steps": 9}
 }
 
-def load_model(model_name: str, quantize: int | None):
+def _resolve_model_path(model_name: str, custom_base_path: str | None) -> str | None:
+    """
+    Resolve a model name to a filesystem path using custom base path.
+
+    Args:
+        model_name: Model identifier (e.g., 'black-forest-labs/FLUX.1-schnell')
+        custom_base_path: Custom base directory path, or None to use HF cache
+
+    Returns:
+        Full filesystem path if custom_base_path is provided and model_name contains '/',
+        otherwise None (use default HuggingFace cache behavior)
+    """
+    if custom_base_path is None:
+        return None
+    if "/" not in model_name:
+        return None
+    return os.path.join(custom_base_path, model_name)
+
+def load_model(model_name: str, quantize: int | None, custom_base_path: str | None = None):
     info = MODEL_REGISTRY.get(model_name, {})
     loader = info.get("loader")
     effective_quantize = quantize if quantize is not None else info.get("quantize")
-    model_path = model_name if "/" in model_name else None
+
+    # Resolve model path using custom base path if provided
+    model_path = _resolve_model_path(model_name, custom_base_path)
+
     if loader == "flux":
         return Flux1.from_name(quantize=effective_quantize, model_name=model_name)
     if loader == "qwen":
@@ -93,7 +116,7 @@ def generate_with_model(instance, model_name: str, task, init_image_path):
         except json.JSONDecodeError:
             prompt = json.dumps({"prompt": prompt})
     common_kwargs = {
-        "seed": task['seed'],
+        "seed": _parse_seed(task['seed']),
         "prompt": prompt,
         "num_inference_steps": steps,
         "height": task['height'],
@@ -105,13 +128,17 @@ def generate_with_model(instance, model_name: str, task, init_image_path):
         return instance.generate_image(**common_kwargs)
     return instance.generate_image(**common_kwargs, guidance=guidance)
 
-def load_model_runtime(model_name: str, quantize: int | None):
+def load_model_runtime(model_name: str, quantize: int | None, custom_base_path: str | None = None):
     global model_instance, model, model_quantize
     if model_name not in MODEL_REGISTRY:
         raise ValueError(f"Unknown model '{model_name}'")
     info = MODEL_REGISTRY.get(model_name, {})
     effective_quantize = quantize if quantize is not None else info.get("quantize")
-    loaded_instance = load_model(model_name, effective_quantize)
+
+    # Use provided custom_base_path, or fall back to global configuration
+    effective_base_path = custom_base_path if custom_base_path is not None else custom_model_base_path
+
+    loaded_instance = load_model(model_name, effective_quantize, effective_base_path)
     with model_lock:
         model = model_name
         model_quantize = effective_quantize
@@ -131,6 +158,12 @@ def _clear_mlx_cache() -> None:
         mx.clear_cache()
     except AttributeError:
         metal_compat.clear_cache()
+
+def _parse_seed(seed_value):
+    try:
+        return int(seed_value)
+    except Exception:
+        return int(hashlib.md5(str(seed_value).encode()).hexdigest(), 16) % (2**31 - 1)
 
 
 def compute_image_task():
@@ -267,16 +300,18 @@ class LoadModel(Resource):
     def post(self):
         """
         The /load endpoint replaces the currently loaded model.
+        Optional 'model_path' parameter in request body overrides the global configuration.
         """
         args = request.json or {}
         requested_model = args.get('model')
         if not requested_model:
             return jsonify({"error": "model is required"}), 400
         requested_quantize = args.get('quantize', None)
+        requested_model_path = args.get('model_path', None)
         try:
             if requested_quantize is not None:
                 requested_quantize = int(requested_quantize)
-            load_model_runtime(requested_model, requested_quantize)
+            load_model_runtime(requested_model, requested_quantize, requested_model_path)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         return jsonify({
@@ -491,6 +526,7 @@ def main():
     parser = argparse.ArgumentParser(description='Start a server to generate images with mflux.')
     parser.add_argument('--model', type=str, default=model, choices=MODEL_REGISTRY.keys(), help='The model to use (i.e. "schnell" or "dev").')
     parser.add_argument('--quantize',  "-q", type=int, choices=[4, 8], default=None, help='Quantize the model (4 or 8, Default is None)')
+    parser.add_argument('--model_path', type=str, default=None, help='Base path for pre-converted MLX models (overrides MFLUX_MODEL_PATH env var). Models loaded as {base_path}/{org}/{model_name}')
     parser.add_argument('--host', type=str, default='127.0.0.1', help='The host to listen on')
     parser.add_argument('--port', type=int, default=4030, help='The port to listen on')
     parser.add_argument('--cache_limit', type=int, default=0, help='The metal cache limit in bytes')
@@ -499,6 +535,28 @@ def main():
     global model_quantize
     global model_instance
     global metal_cache_limit
+    global custom_model_base_path
+
+    # Configure custom model path from CLI argument or environment variable
+    # CLI argument takes precedence over environment variable
+    cli_model_path = args.model_path
+    env_model_path = os.environ.get('MFLUX_MODEL_PATH')
+    configured_path = cli_model_path if cli_model_path is not None else env_model_path
+
+    # Validate path if configured
+    if configured_path is not None:
+        if not os.path.exists(configured_path):
+            print(f"Error: Configured model path does not exist: {configured_path}")
+            print(f"Please create the directory or update MFLUX_MODEL_PATH / --model_path")
+            sys.exit(1)
+        if not os.path.isdir(configured_path):
+            print(f"Error: Configured model path is not a directory: {configured_path}")
+            sys.exit(1)
+        print(f"Using custom model path: {configured_path}")
+        custom_model_base_path = configured_path
+    else:
+        custom_model_base_path = None
+
     load_model_runtime(args.model, args.quantize)
 
     metal_cache_limit = args.cache_limit
