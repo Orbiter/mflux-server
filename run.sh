@@ -59,7 +59,7 @@ start_server() {
     local args="--low-ram"  # Enable low-ram mode by default
     while [ $# -gt 0 ]; do
         case "$1" in
-            --host|--port|--model|--quantize|--cache_limit|--model_path)
+            --host|--port|--quantize|--cache_limit|--model_path)
                 args="$args $1 $2"
                 shift 2
                 ;;
@@ -174,7 +174,6 @@ Commands:
 Options (passed to server):
   --host HOST     Host to bind to (default: $DEFAULT_HOST)
   --port PORT     Port to listen on (default: $DEFAULT_PORT)
-  --model MODEL   Model to use
   --quantize N    Quantization level (4 or 8)
   --cache_limit N Memory cache limit
   --model_path    Custom model path
@@ -184,7 +183,7 @@ Examples:
   $0 start                    # Start with defaults
   $0 start --port 8080        # Start on custom port
   $0 stop                     # Stop the server
-  $0 restart --model dev      # Restart with different model
+  $0 restart                  # Restart server
   $0 status                   # Check status
 
 Logs are written to: $LOG_FILE

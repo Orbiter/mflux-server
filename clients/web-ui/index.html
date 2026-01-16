@@ -473,51 +473,52 @@
 
                 var timestamp = getFormattedTimestamp();
 
-                // Handle init_image if a file was selected
-                let base64InitImage = null;
-                if (initImageFile) {
-                    try {
-                        base64InitImage = await new Promise((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = () => resolve(reader.result.split(',')[1]);
-                            reader.onerror = () => reject(reader.error);
-                            reader.readAsDataURL(initImageFile);
-                        });
-                    } catch (error) {
-                        console.error("Error reading init file:", error);
-                        statusTextArea.value = "Error reading init image: " + error.message;
-                        return;
-                    }
-                }
-
                 for (let i = 0; i < count; i++) {
                     var imageNumber = i + 1;
                     statusTextArea.value = "Generating image " + imageNumber + " of " + count + "...";
 
-                    const payload = {
-                        "prompt": prompt,
-                        "model": model,
-                        "n": 1,
-                        "size": `${width}x${height}`,
-                        "response_format": "b64_json",
-                        "steps": steps
-                    };
+                    let endpoint = mfluxendpoint + '/v1/images/generations';
+                    let headers = {};
+                    let body = null;
 
-                    if (seed !== "") {
-                        payload["seed"] = isNaN(seed) ? seed : parseInt(seed);
-                    }
-
-                    if (base64InitImage) {
-                        payload["init_image"] = base64InitImage;
+                    if (initImageFile) {
+                        // Use /v1/images/edits with FormData
+                        endpoint = mfluxendpoint + '/v1/images/edits';
+                        const formData = new FormData();
+                        formData.append("image", initImageFile);
+                        formData.append("prompt", prompt);
+                        formData.append("model", model);
+                        formData.append("n", 1);
+                        formData.append("size", `${width}x${height}`);
+                        formData.append("response_format", "b64_json");
+                        formData.append("steps", steps); // Extra param
+                        if (seed !== "") {
+                             formData.append("seed", isNaN(seed) ? seed : parseInt(seed));
+                        }
+                        // We don't set Content-Type header for FormData, browser does it with boundary
+                        body = formData;
+                    } else {
+                        // Use /v1/images/generations with JSON
+                        const payload = {
+                            "prompt": prompt,
+                            "model": model,
+                            "n": 1,
+                            "size": `${width}x${height}`,
+                            "response_format": "b64_json",
+                            "steps": steps
+                        };
+                        if (seed !== "") {
+                            payload["seed"] = isNaN(seed) ? seed : parseInt(seed);
+                        }
+                        headers['Content-Type'] = 'application/json';
+                        body = JSON.stringify(payload);
                     }
 
                     try {
-                        const response = await fetch(mfluxendpoint + '/v1/images/generations', {
+                        const response = await fetch(endpoint, {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(payload)
+                            headers: headers,
+                            body: body
                         });
 
                         if (!response.ok) {

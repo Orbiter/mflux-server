@@ -53,12 +53,27 @@ def worker_loop():
 
         if task:
             task_id = task['id']
-            temp_init_image_path = None
+            files_to_cleanup = []
             try:
                 logger.info(f"Processing task {task_id}")
 
-                # Extract generation parameters
+                # Parse parameters
                 prompt = task['params'].get('prompt')
+                requested_model = task['params'].get('model')
+
+                # Dynamic Model Loading
+                if requested_model:
+                    # Check if we need to load or switch models
+                    if model_adapter is None or model_adapter.model_name != requested_model:
+                        logger.info(f"Switching model to {requested_model}...")
+                        try:
+                            load_model(requested_model)
+                        except Exception as e:
+                            logger.error(f"Failed to load model {requested_model}: {e}")
+                            raise RuntimeError(f"Failed to load model {requested_model}: {e}")
+                elif model_adapter is None:
+                     raise RuntimeError("No model loaded and no model specified in request.")
+
                 # OpenAI uses 'size' like "1024x1024", we need to parse it or expect width/height
                 size = task['params'].get('size', "1024x1024")
                 if isinstance(size, str) and "x" in size:
@@ -82,7 +97,7 @@ def worker_loop():
 
                 # Add any other extra parameters
                 for k, v in task['params'].items():
-                    if k not in ['prompt', 'n', 'size', 'response_format', 'model', 'steps', 'seed', 'width', 'height', 'scheduler', 'init_image']:
+                    if k not in ['prompt', 'n', 'size', 'response_format', 'model', 'steps', 'seed', 'width', 'height', 'scheduler', 'init_image', 'init_image_path', 'mask_image_path']:
                         kwargs[k] = v
 
                 # Handle init_image (Base64)
@@ -98,16 +113,29 @@ def worker_loop():
                         # Create a temporary file for the init image
                         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
                             tmp.write(img_bytes)
-                            temp_init_image_path = tmp.name
+                            files_to_cleanup.append(tmp.name)
 
-                        kwargs['init_image_path'] = temp_init_image_path
-                        logger.info(f"Decoded init_image to {temp_init_image_path}")
+                        kwargs['init_image_path'] = files_to_cleanup[-1]
+                        logger.info(f"Decoded init_image to {kwargs['init_image_path']}")
                     except Exception as e:
                         logger.error(f"Failed to decode init_image: {e}")
                         # Continue without init_image or fail? For now, we'll try to continue or it might fail later
 
+                # Handle paths passed directly (from edits endpoint)
+                if 'init_image_path' in task['params']:
+                    kwargs['init_image_path'] = task['params']['init_image_path']
+                    files_to_cleanup.append(task['params']['init_image_path'])
+
+                if 'mask_image_path' in task['params']:
+                    kwargs['mask_image_path'] = task['params']['mask_image_path']
+                    files_to_cleanup.append(task['params']['mask_image_path'])
+
                 # Generate
                 start_time = time.time()
+
+                if model_adapter is None:
+                    raise RuntimeError("No model loaded. Please restart the server with a --model argument or ensure a model is loaded.")
+
                 image = model_adapter.generate(prompt=prompt, **kwargs)
                 generation_time = time.time() - start_time
                 logger.info(f"Generation for {task_id} completed in {generation_time:.2f}s")
@@ -129,13 +157,14 @@ def worker_loop():
                         'error': str(e)
                     }
             finally:
-                # Clean up temporary init image if it was created
-                if temp_init_image_path and os.path.exists(temp_init_image_path):
-                    try:
-                        os.remove(temp_init_image_path)
-                        logger.info(f"Cleaned up temporary file {temp_init_image_path}")
-                    except Exception as e:
-                        logger.error(f"Error removing temporary file {temp_init_image_path}: {e}")
+                # Clean up temporary files
+                for path in files_to_cleanup:
+                    if os.path.exists(path):
+                        try:
+                            os.remove(path)
+                            logger.info(f"Cleaned up temporary file {path}")
+                        except Exception as e:
+                            logger.error(f"Error removing temporary file {path}: {e}")
         else:
             time.sleep(0.1)
 
@@ -216,9 +245,161 @@ def generate_image():
     return jsonify({"error": {"message": "Request timed out", "type": "server_error", "code": "timeout"}}), 504
 
 
+@app.route('/v1/images/edits', methods=['POST'])
+def edit_image():
+    # OpenAI compatible endpoint for image edits (inpainting/img2img)
+    # Uses multipart/form-data
+
+    if 'image' not in request.files:
+         return jsonify({"error": {"message": "Missing required parameter 'image'", "type": "invalid_request_error", "code": "missing_required_parameter"}}), 400
+
+    image_file = request.files['image']
+    mask_file = request.files.get('mask')
+
+    # Extract form parameters
+    prompt = request.form.get('prompt')
+    if not prompt:
+         return jsonify({"error": {"message": "Missing required parameter 'prompt'", "type": "invalid_request_error", "code": "missing_required_parameter"}}), 400
+
+    # Optional parameters
+    n = int(request.form.get('n', 1))
+    size = request.form.get('size', "1024x1024")
+    response_format = request.form.get('response_format', 'url')
+    # model = request.form.get('model', 'z-image-turbo') # Unused for now as we have a single loaded model
+
+    # Parse generic params usually passed in JSON
+    # We might receive 'steps', 'seed', 'scheduler' etc in form data
+    params = {}
+    for key, value in request.form.items():
+        if key not in ['image', 'mask']:
+            # Try to convert to int/float if possible for known numeric params
+            if key in ['steps', 'num_inference_steps', 'seed', 'width', 'height', 'guidance']:
+                try:
+                    params[key] = int(value)
+                except:
+                    try:
+                        params[key] = float(value)
+                    except:
+                        params[key] = value
+            else:
+                params[key] = value
+
+    # Save uploaded files to temporary paths
+    # These will be passed to the worker which is responsible for cleanup
+    try:
+        init_image_path = None
+        mask_image_path = None
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+            image_file.save(tmp.name)
+            init_image_path = tmp.name
+            params['init_image_path'] = init_image_path
+
+        if mask_file:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                mask_file.save(tmp.name)
+                mask_image_path = tmp.name
+                params['mask_image_path'] = mask_image_path
+
+    except Exception as e:
+        logger.error(f"Failed to save uploaded files: {e}")
+        # Clean up if partial failure
+        if init_image_path and os.path.exists(init_image_path):
+            os.remove(init_image_path)
+        if mask_image_path and os.path.exists(mask_image_path):
+            os.remove(mask_image_path)
+        return jsonify({"error": {"message": f"Failed to process uploaded files: {str(e)}", "type": "server_error", "code": "file_upload_error"}}), 500
+
+    # Create task
+    task_id = str(uuid.uuid4())
+    task = {
+        'id': task_id,
+        'params': params,
+        'created_at': time.time()
+    }
+
+    logger.info(f"Queuing edit task {task_id}")
+    with queue_lock:
+        task_queue.append(task)
+
+    # Wait for result (Blocking the request)
+    timeout = 600
+    start_wait = time.time()
+
+    while time.time() - start_wait < timeout:
+        with result_lock:
+            if task_id in results:
+                result = results[task_id]
+                del results[task_id]
+
+                if result['status'] == 'failed':
+                    return jsonify({"error": {"message": result.get('error', 'Unknown error'), "type": "server_error", "code": "generation_failed"}}), 500
+
+                image = result['image']
+
+                resp_data = []
+                if response_format == 'b64_json':
+                    buffered = io.BytesIO()
+                    image.save(buffered, format="PNG")
+                    img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+                    resp_data.append({"b64_json": img_str})
+                else:
+                     buffered = io.BytesIO()
+                     image.save(buffered, format="PNG")
+                     img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+                     resp_data.append({"b64_json": img_str, "msg": "returned b64_json as url hosting is not configured"})
+
+                return jsonify({
+                    "created": result['created'],
+                    "data": resp_data
+                })
+
+        time.sleep(0.5)
+
+    return jsonify({"error": {"message": "Request timed out", "type": "server_error", "code": "timeout"}}), 504
+
+
+
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({"status": "healthy", "model": model_adapter.model_name if model_adapter else "none"})
+
+def load_model(model_name: str):
+    """
+    Loads or switches the model adapter based on the requested model name.
+    """
+    global model_adapter, configured_model_path
+
+    logger.info(f"Attempting to load model: {model_name}")
+
+    if model_name == 'z-image-turbo' or "z-image-turbo" in model_name:
+        new_adapter = ZImageTurboAdapter()
+        new_adapter.load(model_name, model_path=configured_model_path)
+        model_adapter = new_adapter
+    elif model_name in ['schnell', 'dev'] or 'flux' in model_name.lower():
+        new_adapter = FluxAdapter()
+        new_adapter.load(model_name, model_path=configured_model_path)
+        model_adapter = new_adapter
+    elif 'qwen' in model_name.lower():
+        new_adapter = QwenAdapter()
+        new_adapter.load(model_name, model_path=configured_model_path)
+        model_adapter = new_adapter
+    elif 'fibo' in model_name.lower():
+        new_adapter = FIBOAdapter()
+        new_adapter.load(model_name, model_path=configured_model_path)
+        model_adapter = new_adapter
+    else:
+        # Fallback: try to guess based on standard names or fail
+        # For now, we'll try Flux if it looks like a repo, otherwise error
+        # Actually, let's error if we can't determine type, or assume Flux as generic
+        if "flux" in model_name.lower():
+             new_adapter = FluxAdapter()
+             new_adapter.load(model_name, model_path=configured_model_path)
+             model_adapter = new_adapter
+        else:
+            raise ValueError(f"Unknown model type for: {model_name}")
+
+    logger.info(f"Successfully loaded model: {model_name}")
 
 def scan_models(model_path: Optional[str]) -> List[Dict[str, Any]]:
     """
@@ -237,14 +418,6 @@ def scan_models(model_path: Optional[str]) -> List[Dict[str, Any]]:
         })
 
     if not model_path or not os.path.exists(model_path):
-        # If no path, and no model loaded, return a default
-        if not models:
-            models.append({
-                "id": "z-image-turbo",
-                "object": "model",
-                "created": int(time.time()),
-                "owned_by": "mflux"
-            })
         return models
 
     # Scan the directory
@@ -287,7 +460,6 @@ def main():
     global model_adapter, configured_model_path
 
     parser = argparse.ArgumentParser(description='OpenAI-compatible Image Generation Server')
-    parser.add_argument('--model', type=str, default='z-image-turbo', help='Model to load (default: z-image-turbo)')
     parser.add_argument('--host', type=str, default='127.0.0.1', help='Host to bind to')
     parser.add_argument('--port', type=int, default=4030, help='Port to listen on')
     parser.add_argument('--quantize', type=int, default=None, help='Quantization level')
@@ -298,26 +470,7 @@ def main():
     args = parser.parse_args()
     configured_model_path = args.model_path
 
-    # Initialize adapter
-    if args.model == 'z-image-turbo':
-        model_adapter = ZImageTurboAdapter()
-        logger.info(f"Loading model {args.model}...")
-        model_adapter.load(args.model, quantize=args.quantize, model_path=args.model_path)
-    elif args.model in ['schnell', 'dev'] or 'flux' in args.model.lower():
-        model_adapter = FluxAdapter()
-        logger.info(f"Loading Flux model {args.model}...")
-        model_adapter.load(args.model, quantize=args.quantize, model_path=args.model_path)
-    elif 'qwen' in args.model.lower():
-        model_adapter = QwenAdapter()
-        logger.info(f"Loading Qwen model {args.model}...")
-        model_adapter.load(args.model, quantize=args.quantize, model_path=args.model_path)
-    elif 'fibo' in args.model.lower():
-        model_adapter = FIBOAdapter()
-        logger.info(f"Loading FIBO model {args.model}...")
-        model_adapter.load(args.model, quantize=args.quantize, model_path=args.model_path)
-    else:
-        logger.error(f"Unknown model: {args.model}")
-        return
+    logger.info("No model loaded at startup. Use API to load a model.")
 
     # Start worker thread
     worker = threading.Thread(target=worker_loop, daemon=True)

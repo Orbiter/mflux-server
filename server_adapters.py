@@ -30,6 +30,11 @@ class ModelAdapter(ABC):
         """
         Generate an image from a prompt.
         kwargs will contain model-specific parameters.
+        Common kwargs:
+          - init_image_path (str | Path): Path to initial image for img2img
+          - mask_image_path (str | Path): Path to mask image for inpainting
+          - image_strength (float): Strength of img2img (0.0 to 1.0)
+          - width, height, steps, seed, etc.
         """
         pass
 
@@ -95,12 +100,13 @@ class ZImageTurboAdapter(ModelAdapter):
 
         # img2img parameters (optional)
         init_image_path = kwargs.get('init_image_path')
+        mask_image_path = kwargs.get('mask_image_path')
         image_strength = kwargs.get('image_strength')
 
         # Set seed for MLX
         mx.random.seed(seed)
 
-        print(f"Generating with ZImageTurbo: prompt='{prompt}', steps={steps}, size={width}x{height}, seed={seed}, scheduler={scheduler}")
+        print(f"Generating with ZImageTurbo: prompt='{prompt}', steps={steps}, size={width}x{height}, seed={seed}, scheduler={scheduler}, init_image={init_image_path is not None}, mask={mask_image_path is not None}")
 
         result = self.model.generate_image(
             seed=seed,
@@ -164,11 +170,12 @@ class QwenAdapter(ModelAdapter):
         negative_prompt = kwargs.get('negative_prompt', None)
 
         init_image_path = kwargs.get('init_image_path')
+        mask_image_path = kwargs.get('mask_image_path')
         image_strength = kwargs.get('image_strength')
 
         mx.random.seed(seed)
 
-        print(f"Generating with Qwen: prompt='{prompt}', steps={steps}, size={width}x{height}, seed={seed}")
+        print(f"Generating with Qwen: prompt='{prompt}', steps={steps}, size={width}x{height}, seed={seed}, init_image={init_image_path is not None}, mask={mask_image_path is not None}")
 
         result = self.model.generate_image(
             seed=seed,
@@ -230,11 +237,12 @@ class FIBOAdapter(ModelAdapter):
         negative_prompt = kwargs.get('negative_prompt', None)
 
         init_image_path = kwargs.get('init_image_path')
+        mask_image_path = kwargs.get('mask_image_path')
         image_strength = kwargs.get('image_strength')
 
         mx.random.seed(seed)
 
-        print(f"Generating with FIBO: prompt='{prompt}', steps={steps}, size={width}x{height}, seed={seed}")
+        print(f"Generating with FIBO: prompt='{prompt}', steps={steps}, size={width}x{height}, seed={seed}, init_image={init_image_path is not None}, mask={mask_image_path is not None}")
 
         result = self.model.generate_image(
             seed=seed,
@@ -318,11 +326,12 @@ class FluxAdapter(ModelAdapter):
 
         # img2img parameters
         init_image_path = kwargs.get('init_image_path')
+        mask_image_path = kwargs.get('mask_image_path')
         image_strength = kwargs.get('image_strength')
 
         mx.random.seed(seed)
 
-        print(f"Generating with Flux: prompt='{prompt}', steps={steps}, size={width}x{height}, seed={seed}, guidance={guidance}")
+        print(f"Generating with Flux: prompt='{prompt}', steps={steps}, size={width}x{height}, seed={seed}, guidance={guidance}, init_image={init_image_path is not None}, mask={mask_image_path is not None}")
 
         result = self.model.generate_image(
             seed=seed,
@@ -386,11 +395,12 @@ class QwenAdapter(ModelAdapter):
         negative_prompt = kwargs.get('negative_prompt', None)
 
         init_image_path = kwargs.get('init_image_path')
+        mask_image_path = kwargs.get('mask_image_path')
         image_strength = kwargs.get('image_strength')
 
         mx.random.seed(seed)
 
-        print(f"Generating with Qwen: prompt='{prompt}', steps={steps}, size={width}x{height}, seed={seed}")
+        print(f"Generating with Qwen: prompt='{prompt}', steps={steps}, size={width}x{height}, seed={seed}, init_image={init_image_path is not None}, mask={mask_image_path is not None}")
 
         result = self.model.generate_image(
             seed=seed,
@@ -452,11 +462,12 @@ class FIBOAdapter(ModelAdapter):
         negative_prompt = kwargs.get('negative_prompt', None)
 
         init_image_path = kwargs.get('init_image_path')
+        mask_image_path = kwargs.get('mask_image_path')
         image_strength = kwargs.get('image_strength')
 
         mx.random.seed(seed)
 
-        print(f"Generating with FIBO: prompt='{prompt}', steps={steps}, size={width}x{height}, seed={seed}")
+        print(f"Generating with FIBO: prompt='{prompt}', steps={steps}, size={width}x{height}, seed={seed}, init_image={init_image_path is not None}, mask={mask_image_path is not None}")
 
         result = self.model.generate_image(
             seed=seed,
