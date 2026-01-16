@@ -33,6 +33,4 @@ uv.lock
 *.pid
 *.log
 .mflux-server.pid
-.mflux-server-cuda.pid
 mflux-server.log
-mflux-server-cuda.log

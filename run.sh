@@ -56,7 +56,7 @@ start_server() {
     uv sync --extra mlx --prerelease=allow
 
     # Parse additional arguments
-    local args=""
+    local args="--low-ram"  # Enable low-ram mode by default
     while [ $# -gt 0 ]; do
         case "$1" in
             --host|--port|--model|--quantize|--cache_limit|--model_path)
@@ -81,10 +81,10 @@ start_server() {
     local max_wait=30
     local waited=0
     while [ $waited -lt $max_wait ]; do
-        if is_running && curl -s http://127.0.0.1:$DEFAULT_PORT/api/ps > /dev/null 2>&1; then
+        if is_running && curl -s http://127.0.0.1:$DEFAULT_PORT/health > /dev/null 2>&1; then
             echo "Server started successfully (PID: $pid)"
             echo "API available at: http://127.0.0.1:$DEFAULT_PORT"
-            echo "Swagger docs at: http://127.0.0.1:$DEFAULT_PORT/swagger"
+            echo "Swagger docs are no longer available in this MVP version"
             return 0
         fi
         sleep 1
@@ -148,7 +148,7 @@ status_server() {
         # Try to get server info
         if command -v curl > /dev/null 2>&1; then
             echo "Server info:"
-            curl -s http://127.0.0.1:$DEFAULT_PORT/api/ps 2>/dev/null | python3 -m json.tool 2>/dev/null || echo "  Unable to fetch server info"
+            curl -s http://127.0.0.1:$DEFAULT_PORT/health 2>/dev/null | python3 -m json.tool 2>/dev/null || echo "  Unable to fetch server info"
         fi
         return 0
     else
@@ -178,6 +178,7 @@ Options (passed to server):
   --quantize N    Quantization level (4 or 8)
   --cache_limit N Memory cache limit
   --model_path    Custom model path
+  --low-ram       Enable Low-RAM mode (enabled by default)
 
 Examples:
   $0 start                    # Start with defaults
