@@ -7,6 +7,7 @@ import base64
 import io
 import json
 import logging
+import tempfile
 from typing import Dict, Any, List, Optional
 from flask import Flask, request, jsonify, abort, Response
 from flask_cors import CORS
@@ -52,6 +53,7 @@ def worker_loop():
 
         if task:
             task_id = task['id']
+            temp_init_image_path = None
             try:
                 logger.info(f"Processing task {task_id}")
 
@@ -80,8 +82,29 @@ def worker_loop():
 
                 # Add any other extra parameters
                 for k, v in task['params'].items():
-                    if k not in ['prompt', 'n', 'size', 'response_format', 'model', 'steps', 'seed', 'width', 'height', 'scheduler']:
+                    if k not in ['prompt', 'n', 'size', 'response_format', 'model', 'steps', 'seed', 'width', 'height', 'scheduler', 'init_image']:
                         kwargs[k] = v
+
+                # Handle init_image (Base64)
+                if 'init_image' in task['params']:
+                    try:
+                        init_image_data = task['params']['init_image']
+                        # Sometimes base64 strings come with data:image/png;base64, prefix
+                        if ',' in init_image_data:
+                            init_image_data = init_image_data.split(',')[1]
+
+                        img_bytes = base64.b64decode(init_image_data)
+
+                        # Create a temporary file for the init image
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                            tmp.write(img_bytes)
+                            temp_init_image_path = tmp.name
+
+                        kwargs['init_image_path'] = temp_init_image_path
+                        logger.info(f"Decoded init_image to {temp_init_image_path}")
+                    except Exception as e:
+                        logger.error(f"Failed to decode init_image: {e}")
+                        # Continue without init_image or fail? For now, we'll try to continue or it might fail later
 
                 # Generate
                 start_time = time.time()
@@ -105,6 +128,14 @@ def worker_loop():
                         'status': 'failed',
                         'error': str(e)
                     }
+            finally:
+                # Clean up temporary init image if it was created
+                if temp_init_image_path and os.path.exists(temp_init_image_path):
+                    try:
+                        os.remove(temp_init_image_path)
+                        logger.info(f"Cleaned up temporary file {temp_init_image_path}")
+                    except Exception as e:
+                        logger.error(f"Error removing temporary file {temp_init_image_path}: {e}")
         else:
             time.sleep(0.1)
 
