@@ -452,7 +452,7 @@
                 generateImages();
             });
 
-            function generateImages() {
+            async function generateImages() {
                 // Update mfluxendpoint in case it was changed
                 mfluxendpoint = mfluxServerInput.value;
 
@@ -462,20 +462,8 @@
                 var height = parseInt(document.getElementById('height').value);
                 var steps = parseInt(document.getElementById('steps').value);
                 var seed = document.getElementById('seed').value;
-                var quality = parseInt(document.getElementById('quality').value);
                 var count = parseInt(document.getElementById('count').value);
-
-                var dataTemplate = {
-                    "prompt": prompt,
-                    "height": height,
-                    "width": width,
-                    "steps": steps,
-                    "guidance": 3.5,
-                    "format": "JPEG",
-                    "quality": quality,
-                    "priority": false,
-                    "init_image": null
-                };
+                var model = document.getElementById('model-select').value;
 
                 var statusTextArea = document.getElementById('status');
                 var imageContainer = document.getElementById('image-container');
@@ -483,123 +471,78 @@
                 statusTextArea.value = "Starting image generation...";
                 imageContainer.innerHTML = ''; // Clear previous images
 
-                // Generate timestamp for filenames
                 var timestamp = getFormattedTimestamp();
-                var currentIndex = 0;
 
-                // Include init_image in data if a file was selected
+                // Handle init_image if a file was selected
+                let base64InitImage = null;
                 if (initImageFile) {
-                    const loadImageAsBase64 = (file) => {
-                        return new Promise((resolve, reject) => {
+                    try {
+                        base64InitImage = await new Promise((resolve, reject) => {
                             const reader = new FileReader();
-                            reader.onload = () => resolve(reader.result.split(',')[1]); // Extract the Base64 part
+                            reader.onload = () => resolve(reader.result.split(',')[1]);
                             reader.onerror = () => reject(reader.error);
-                            reader.readAsDataURL(file);
+                            reader.readAsDataURL(initImageFile);
                         });
-                    };
-                    loadImageAsBase64(initImageFile).then(base64Image => {
-                        dataTemplate["init_image"] = base64Image;
-                        generateNextImage();
-                    }).catch(error => {
-                        console.error("Error reading file:", error);
-                    });
-                } else {
-                    generateNextImage();
-                }
-
-                function generateNextImage() {
-                    if (currentIndex >= count) {
-                        statusTextArea.value = "All images generated.";
+                    } catch (error) {
+                        console.error("Error reading init file:", error);
+                        statusTextArea.value = "Error reading init image: " + error.message;
                         return;
                     }
+                }
 
-                    var data = Object.assign({}, dataTemplate);
-
-                    // If seed is not provided, remove it to get a random seed each time
-                    if (seed === "") {
-                        delete data["seed"];
-                    } else {
-                        data["seed"] = seed;
-                    }
-
-                    var body = JSON.stringify(data);
-                    var imageNumber = currentIndex + 1;
+                for (let i = 0; i < count; i++) {
+                    var imageNumber = i + 1;
                     statusTextArea.value = "Generating image " + imageNumber + " of " + count + "...";
 
-                    // Send POST request to /generate
-                    fetch(mfluxendpoint + '/api/generate', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: body
-                    })
-                    .then(function(response) {
-                        if (!response.ok) {
-                            throw new Error('Failed to start image generation.');
-                        }
-                        return response.json();
-                    })
-                    .then(function(jsonResp) {
-                        var task_id = jsonResp["task_id"];
-                        var expected_time = jsonResp["expected_time_seconds"];
-                        statusTextArea.value = "Task " + imageNumber + " started. Expected time: " + expected_time.toFixed(1) + " seconds.";
-                        // Start polling for status
-                        pollStatus(task_id, imageNumber);
-                    })
-                    .catch(function(error) {
-                        statusTextArea.value = error.message;
-                    });
-                }
+                    const payload = {
+                        "prompt": prompt,
+                        "model": model,
+                        "n": 1,
+                        "size": `${width}x${height}`,
+                        "response_format": "b64_json",
+                        "steps": steps
+                    };
 
-                function pollStatus(task_id, imageNumber) {
-                    var pollInterval = setInterval(function() {
-                        fetch(mfluxendpoint + '/api/status?task_id=' + task_id)
-                        .then(function(response) {
-                            if (!response.ok) {
-                                throw new Error('Failed to get status.');
-                            }
-                            return response.json();
-                        })
-                        .then(function(statusJson) {
-                            var status = statusJson["status"];
-                            if (status === "done") {
-                                clearInterval(pollInterval);
-                                // Get the image
-                                fetch(mfluxendpoint + '/api/image?task_id=' + task_id + '&base64=false&delete=true')
-                                .then(function(imageResp) {
-                                    if (!imageResp.ok) {
-                                        throw new Error('Failed to retrieve image.');
-                                    }
-                                    return imageResp.blob();
-                                })
-                                .then(function(imageBlob) {
-                                    var imageUrl = URL.createObjectURL(imageBlob);
-                                    var imgWrapper = createImageElement(imageUrl, imageNumber, timestamp);
-                                    imageContainer.appendChild(imgWrapper);
-                                    statusTextArea.value = "Image " + imageNumber + " of " + count + " generated.";
-                                    currentIndex++;
-                                    // Generate next image
-                                    generateNextImage();
-                                })
-                                .catch(function(error) {
-                                    statusTextArea.value = error.message;
-                                });
-                            } else {
-                                var wait_remaining = statusJson["wait_remaining"] || 1;
-                                var pos = statusJson["pos"] || 0;
-                                var statusText = "Generating image " + imageNumber + " of " + count + ": Status: " + status + ", Position in queue: " + pos + ", Estimated wait time: " + wait_remaining.toFixed(1) + " seconds.";
-                                statusTextArea.value = statusText;
-                            }
-                        })
-                        .catch(function(error) {
-                            clearInterval(pollInterval);
-                            statusTextArea.value = error.message;
+                    if (seed !== "") {
+                        payload["seed"] = isNaN(seed) ? seed : parseInt(seed);
+                    }
+
+                    if (base64InitImage) {
+                        payload["init_image"] = base64InitImage;
+                    }
+
+                    try {
+                        const response = await fetch(mfluxendpoint + '/v1/images/generations', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(payload)
                         });
-                    }, 1000); // Poll every 1 second
+
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error?.message || 'Generation failed');
+                        }
+
+                        const jsonResp = await response.json();
+                        const b64Data = jsonResp.data[0].b64_json;
+                        const imageUrl = `data:image/png;base64,${b64Data}`;
+
+                        const imgWrapper = createImageElement(imageUrl, imageNumber, timestamp);
+                        imageContainer.appendChild(imgWrapper);
+
+                        statusTextArea.value = "Image " + imageNumber + " of " + count + " generated.";
+                    } catch (error) {
+                        statusTextArea.value = "Error: " + error.message;
+                        return; // Stop on error
+                    }
                 }
 
-                function createImageElement(imageUrl, imageNumber, timestamp) {
+                statusTextArea.value = "All images generated.";
+            }
+
+            function createImageElement(imageUrl, imageNumber, timestamp) {
                     var imageWrapper = document.createElement('div');
                     imageWrapper.className = 'image-wrapper';
 
