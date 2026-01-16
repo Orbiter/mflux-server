@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Union, List
 import pathlib
 import os
+import random
 from PIL import Image
 import mlx.core as mx
 
@@ -92,7 +93,7 @@ class ZImageTurboAdapter(ModelAdapter):
         # Note: OpenAI API uses 'n' for number of images, 'size' for dimensions (e.g. "1024x1024")
         # But here we expect parsed arguments from the controller.
 
-        seed = kwargs.get('seed', 0) # API should handle seed generation if not provided
+        seed = kwargs['seed'] if 'seed' in kwargs and kwargs['seed'] is not None else random.randint(0, 2**32 - 1)
         steps = kwargs.get('num_inference_steps', 4) # Default for Turbo is usually low
         height = kwargs.get('height', 1024)
         width = kwargs.get('width', 1024)
@@ -161,7 +162,7 @@ class QwenAdapter(ModelAdapter):
         if not self.model:
             raise RuntimeError("Model not loaded. Call load() first.")
 
-        seed = kwargs.get('seed', 0)
+        seed = kwargs['seed'] if 'seed' in kwargs and kwargs['seed'] is not None else random.randint(0, 2**32 - 1)
         steps = kwargs.get('num_inference_steps', 4)
         height = kwargs.get('height', 1024)
         width = kwargs.get('width', 1024)
@@ -228,7 +229,7 @@ class FIBOAdapter(ModelAdapter):
         if not self.model:
             raise RuntimeError("Model not loaded. Call load() first.")
 
-        seed = kwargs.get('seed', 0)
+        seed = kwargs['seed'] if 'seed' in kwargs and kwargs['seed'] is not None else random.randint(0, 2**32 - 1)
         steps = kwargs.get('num_inference_steps', 4)
         height = kwargs.get('height', 1024)
         width = kwargs.get('width', 1024)
@@ -313,7 +314,7 @@ class FluxAdapter(ModelAdapter):
         if not self.model:
             raise RuntimeError("Model not loaded. Call load() first.")
 
-        seed = kwargs.get('seed', 0)
+        seed = kwargs['seed'] if 'seed' in kwargs and kwargs['seed'] is not None else random.randint(0, 2**32 - 1)
         # Default steps: 4 for schnell, 25 for dev. API controller might pass a generic default (4)
         # We should respect what's passed, but if the user passed 'flux' generically, we might want smart defaults.
         # For now, we trust the controller passed params.
@@ -350,138 +351,3 @@ class FluxAdapter(ModelAdapter):
             return result.image
         return result
 
-class QwenAdapter(ModelAdapter):
-    """
-    Adapter for QwenImage model.
-    """
-    def __init__(self):
-        self.model: Optional[QwenImage] = None
-        self.model_name: str = ""
-
-    def load(self, model_name: str, quantize: Optional[int] = None, model_path: Optional[str] = None):
-        self.model_name = model_name
-        hf_model_name = "Qwen/Qwen-Image" # Default if not overridden
-
-        # Resolve model path
-        final_model_path = model_path
-        if model_path:
-            # Check for common Qwen structures if base path provided
-            candidates = [
-                os.path.join(model_path, "Qwen/Qwen-Image"),
-                os.path.join(model_path, "filipstrand/Qwen-Image-mflux-6bit"),
-                model_path
-            ]
-            for candidate in candidates:
-                if os.path.exists(candidate):
-                    final_model_path = candidate
-                    print(f"Resolved Qwen model path to: {final_model_path}")
-                    break
-
-        # QwenImage doesn't have from_name, requires direct instantiation
-        # Will default to huggingface if path is None
-        self.model = QwenImage(quantize=quantize, model_path=final_model_path)
-        print(f"Loaded Qwen model: {model_name} (Path: {final_model_path or hf_model_name})")
-
-    def generate(self, prompt: str, **kwargs) -> Image.Image:
-        if not self.model:
-            raise RuntimeError("Model not loaded. Call load() first.")
-
-        seed = kwargs.get('seed', 0)
-        steps = kwargs.get('num_inference_steps', 4)
-        height = kwargs.get('height', 1024)
-        width = kwargs.get('width', 1024)
-        guidance = kwargs.get('guidance', 4.0) # Default guidance for Qwen
-        scheduler = kwargs.get('scheduler', 'linear')
-        negative_prompt = kwargs.get('negative_prompt', None)
-
-        init_image_path = kwargs.get('init_image_path')
-        mask_image_path = kwargs.get('mask_image_path')
-        image_strength = kwargs.get('image_strength')
-
-        mx.random.seed(seed)
-
-        print(f"Generating with Qwen: prompt='{prompt}', steps={steps}, size={width}x{height}, seed={seed}, init_image={init_image_path is not None}, mask={mask_image_path is not None}")
-
-        result = self.model.generate_image(
-            seed=seed,
-            prompt=prompt,
-            num_inference_steps=steps,
-            height=height,
-            width=width,
-            guidance=guidance,
-            image_path=init_image_path,
-            image_strength=image_strength,
-            scheduler=scheduler,
-            negative_prompt=negative_prompt
-        )
-
-        if hasattr(result, "image"):
-            return result.image
-        return result
-
-class FIBOAdapter(ModelAdapter):
-    """
-    Adapter for FIBO model.
-    """
-    def __init__(self):
-        self.model: Optional[FIBO] = None
-        self.model_name: str = ""
-
-    def load(self, model_name: str, quantize: Optional[int] = None, model_path: Optional[str] = None):
-        self.model_name = model_name
-        hf_model_name = "briaai/FIBO" # Default
-
-        # Resolve model path
-        final_model_path = model_path
-        if model_path:
-            candidates = [
-                os.path.join(model_path, "briaai/FIBO"),
-                os.path.join(model_path, "briaai/Fibo-mlx-4bit"),
-                os.path.join(model_path, "briaai/Fibo-mlx-8bit"),
-                model_path
-            ]
-            for candidate in candidates:
-                if os.path.exists(candidate):
-                    final_model_path = candidate
-                    print(f"Resolved FIBO model path to: {final_model_path}")
-                    break
-
-        self.model = FIBO(quantize=quantize, model_path=final_model_path)
-        print(f"Loaded FIBO model: {model_name} (Path: {final_model_path or hf_model_name})")
-
-    def generate(self, prompt: str, **kwargs) -> Image.Image:
-        if not self.model:
-            raise RuntimeError("Model not loaded. Call load() first.")
-
-        seed = kwargs.get('seed', 0)
-        steps = kwargs.get('num_inference_steps', 4)
-        height = kwargs.get('height', 1024)
-        width = kwargs.get('width', 1024)
-        guidance = kwargs.get('guidance', 4.0)
-        scheduler = kwargs.get('scheduler', 'linear')
-        negative_prompt = kwargs.get('negative_prompt', None)
-
-        init_image_path = kwargs.get('init_image_path')
-        mask_image_path = kwargs.get('mask_image_path')
-        image_strength = kwargs.get('image_strength')
-
-        mx.random.seed(seed)
-
-        print(f"Generating with FIBO: prompt='{prompt}', steps={steps}, size={width}x{height}, seed={seed}, init_image={init_image_path is not None}, mask={mask_image_path is not None}")
-
-        result = self.model.generate_image(
-            seed=seed,
-            prompt=prompt,
-            num_inference_steps=steps,
-            height=height,
-            width=width,
-            guidance=guidance,
-            image_path=init_image_path,
-            image_strength=image_strength,
-            scheduler=scheduler,
-            negative_prompt=negative_prompt
-        )
-
-        if hasattr(result, "image"):
-            return result.image
-        return result
