@@ -1,40 +1,34 @@
-# mflux Image Generator Front-end
+# MFLUX Modern Web Client
 
-This project is a web-based front-end for the `mflux-server` image generation server. It provides a simple and intuitive interface to generate multiple images based on user-defined prompts and parameters.
-
-![Screenshot of mflux Image Generator Front-end](screenshot.png)
+A high-fidelity, modern web interface for the `mflux-server` image generation backend.
 
 ## Features
 
-- **Multi-Image Generation**: Generate multiple images in a single request, allowing for efficient batch image creation.
-- **Convenient Image Download**: Each generated image includes a dedicated download button, making it easy to save images to your local system.
-- **Collision-Free Naming**: Images are saved with unique, timestamped filenames to prevent filename collisions, enabling smooth handling of large image sets.
-
-## Installation
-
-1. Ensure you have a running instance of `mflux-server`. The front-end requires this server to handle image generation requests.
-2. No additional installation is needed for the front-end. Simply double-click `index.html` to open it in your browser.
+- **Modern UI/UX**: Sophisticated deep charcoal theme with a split-screen layout for an immersive creation experience.
+- **Real-time Configuration**: Adjust model, dimensions, steps, and quality with custom controls.
+- **Image-to-Image Support**: Drag and drop or upload initial images to guide generation.
+- **Gallery View**: Generated images appear in a responsive grid with one-click download.
+- **Auto-Persistence**: Server settings are saved automatically.
 
 ## Usage
 
-1. Enter a prompt and configure the parameters (image dimensions, quality, and other settings).
-2. Click the "Generate Image(s)" button to start the image generation process.
-3. Once generated, each image appears with a download button, allowing for quick saving.
+1. **Start the Server**: Ensure your `mflux-server` is running.
+   ```bash
+   ./run.sh
+   ```
+
+2. **Open the Client**: Open `index.html` in any modern web browser. No build step required.
+
+3. **Generate**:
+   - Enter your prompt in the large text area.
+   - Adjust settings in the sidebar.
+   - Click **Generate** (or `Cmd/Ctrl + Enter`).
 
 ## Requirements
 
-- `mflux-server` running on a specified endpoint (default is `http://localhost:4030`).
-
-## Getting Started
-
-1. Ensure the `mflux-server` is running and accessible.
-2. Open the `index.html` file in your browser.
-3. Customize your settings and start generating images!
+- `mflux-server` running (default: `http://localhost:4030`)
+- A modern web browser (Chrome, Firefox, Safari, Edge)
 
 ## Customization
 
-You can modify default settings such as the `mflux-server` endpoint directly in the form. The server address is also saved locally for convenience.
-
-## License
-
-This project is licensed under the Apache License 2.0.
+The interface uses modern CSS variables defined in `style.css`. You can easily adjust the color palette (`--bg-main`, `--accent-primary`, etc.) to match your preferences.

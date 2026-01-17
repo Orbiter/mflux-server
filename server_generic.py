@@ -224,18 +224,18 @@ def compute_image_task():
         if current_model_instance == None or len(tasklist) == 0:
             time.sleep(1)
             continue
-        
+
         # loop through the tasklist and get the first task which has no image assigned
         foundimage = False
         for task in tasklist:
-            if 'image' in task: continue          
+            if 'image' in task: continue
             # found a task without image
             compute_time = time.time()
             task['compute_time'] = compute_time
             # generate the image
             _set_mlx_cache_limit(metal_cache_limit)
             init_image = task['init_image']
-            
+
             # make a temporary file path for the init_image
             if init_image:
                 init_image_path = Path(f"/tmp/init_image_{task['task_id']}.png")
@@ -259,7 +259,7 @@ def compute_image_task():
             end_time = time.time()
             ctime += end_time - compute_time
             pixels += task['height'] * task['width']
-            
+
             # convert the image (we do not count this on the computation time on purpose)
             # we do this here and not during retrieval to save memory in the tasklist
             format = task.get('format', 'JPEG').upper()
@@ -277,16 +277,16 @@ def compute_image_task():
                 jpeg_image.seek(0)
                 task['image'] = jpeg_image
                 del jpeg_image
-                
+
             # Free resources
             del generated_image
             _clear_mlx_cache()
             gc.collect()
-            
+
             task['end_time'] = end_time # end time of the task
             foundimage = True
             break
-        
+
         # if we did not found any task without image, we sleep for 1 second
         if not foundimage: time.sleep(1)
 
@@ -375,7 +375,7 @@ class LoadModel(Resource):
             "quantize": model_quantize,
             "default_steps": MODEL_REGISTRY.get(model, {}).get("steps", 4)
         })
-    
+
 @api.route('/generate')
 class GenerateImage(Resource):
     @api.expect(task_model, validate=True)
@@ -412,7 +412,7 @@ class GenerateImage(Resource):
                 print("init_image", init_image.size, init_image.mode)
             except Exception as e:
                 pass # ignore errors
-            
+
         start_time = time.time()
         # taskid is a 8-digit hex hash to identify the image
         md5 = hashlib.md5()
@@ -433,7 +433,7 @@ class GenerateImage(Resource):
             'start_time': start_time,
             'init_image': init_image
         }
-        
+
         # compute waiting time based on the number of pixels in the queue
         wait_for_pixels = width * height # include the current task
         if priority and len(tasklist) > 1:
@@ -513,7 +513,7 @@ class GetImage(Resource):
                     format = task['format']
                     base64p = str_to_bool(request.args.get('base64', default='false'))
                     deletep = str_to_bool(request.args.get('delete', default='true'))
-                    if deletep: 
+                    if deletep:
                         tasklist.remove(task)
                         gc.collect()
                     if base64p:
@@ -560,7 +560,7 @@ class GetTasks(Resource):
         for task in tasklist:
             task0 = task.copy()
             if 'image' in task0: del task0['image']
-            tasklist0.append(task0)        
+            tasklist0.append(task0)
         return jsonify(tasklist0)
 
 @api.route('/clear')
@@ -569,14 +569,6 @@ class ClearTasks(Resource):
     def get(self):
         tasklist.clear()
         return Response(status=200)
-
-@app.route('/')
-def redirect_to_index():
-    return redirect('/index.html')
-
-@app.route('/index.html')
-def serve_index():
-    return send_file(os.path.join(apppath, 'clients/web-ui/index.html'))
 
 def main():
     parser = argparse.ArgumentParser(description='Start a server to generate images with mflux.')

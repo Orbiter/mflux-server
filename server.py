@@ -8,9 +8,12 @@ import io
 import json
 import logging
 import tempfile
+import gc
 from typing import Dict, Any, List, Optional
 from flask import Flask, request, jsonify, abort, Response
 from flask_cors import CORS
+import mlx.core as mx
+from mlx.core import metal as metal_compat
 from server_adapters import ZImageTurboAdapter, FluxAdapter, QwenAdapter, FIBOAdapter, ModelAdapter
 
 # Configure logging
@@ -26,6 +29,8 @@ CORS(app)
 # Global state
 model_adapter: Optional[ModelAdapter] = None
 configured_model_path: Optional[str] = None
+configured_quantize: Optional[int] = None
+low_ram_mode: bool = False
 task_queue: List[Dict[str, Any]] = []  # List behaving as a queue
 results: Dict[str, Any] = {}         # Store results by task_id
 queue_lock = threading.Lock()
@@ -34,6 +39,18 @@ shutdown_event = threading.Event()
 
 # Constants
 ResultCleanupTime = 300 # Seconds to keep results around if not picked up (though we use sync wait)
+
+def _set_mlx_cache_limit(limit: int) -> None:
+    try:
+        mx.set_cache_limit(limit)
+    except AttributeError:
+        metal_compat.set_cache_limit(limit)
+
+def _clear_mlx_cache() -> None:
+    try:
+        mx.clear_cache()
+    except AttributeError:
+        metal_compat.clear_cache()
 
 def worker_loop():
     """
@@ -67,12 +84,20 @@ def worker_loop():
                     if model_adapter is None or model_adapter.model_name != requested_model:
                         logger.info(f"Switching model to {requested_model}...")
                         try:
+                            # Clear cache before loading new model to free VRAM
+                            _clear_mlx_cache()
+                            gc.collect()
                             load_model(requested_model)
                         except Exception as e:
                             logger.error(f"Failed to load model {requested_model}: {e}")
                             raise RuntimeError(f"Failed to load model {requested_model}: {e}")
                 elif model_adapter is None:
                      raise RuntimeError("No model loaded and no model specified in request.")
+
+                # Force VAE tiling if low-ram is enabled globally
+                # (load_model sets it initially, but if we switch or reload, ensure it's set)
+                if model_adapter:
+                    model_adapter.set_low_ram(low_ram_mode)
 
                 # OpenAI uses 'size' like "1024x1024", we need to parse it or expect width/height
                 size = task['params'].get('size', "1024x1024")
@@ -139,6 +164,10 @@ def worker_loop():
                 image = model_adapter.generate(prompt=prompt, **kwargs)
                 generation_time = time.time() - start_time
                 logger.info(f"Generation for {task_id} completed in {generation_time:.2f}s")
+
+                # Clean up memory after generation
+                _clear_mlx_cache()
+                gc.collect()
 
                 # Store result
                 with result_lock:
@@ -368,25 +397,29 @@ def load_model(model_name: str):
     """
     Loads or switches the model adapter based on the requested model name.
     """
-    global model_adapter, configured_model_path
+    global model_adapter, configured_model_path, low_ram_mode, configured_quantize
 
     logger.info(f"Attempting to load model: {model_name}")
 
     if model_name == 'z-image-turbo' or "z-image-turbo" in model_name:
         new_adapter = ZImageTurboAdapter()
-        new_adapter.load(model_name, model_path=configured_model_path)
+        new_adapter.load(model_name, quantize=configured_quantize, model_path=configured_model_path)
+        new_adapter.set_low_ram(low_ram_mode)
         model_adapter = new_adapter
     elif model_name in ['schnell', 'dev'] or 'flux' in model_name.lower():
         new_adapter = FluxAdapter()
-        new_adapter.load(model_name, model_path=configured_model_path)
+        new_adapter.load(model_name, quantize=configured_quantize, model_path=configured_model_path)
+        new_adapter.set_low_ram(low_ram_mode)
         model_adapter = new_adapter
     elif 'qwen' in model_name.lower():
         new_adapter = QwenAdapter()
-        new_adapter.load(model_name, model_path=configured_model_path)
+        new_adapter.load(model_name, quantize=configured_quantize, model_path=configured_model_path)
+        new_adapter.set_low_ram(low_ram_mode)
         model_adapter = new_adapter
     elif 'fibo' in model_name.lower():
         new_adapter = FIBOAdapter()
-        new_adapter.load(model_name, model_path=configured_model_path)
+        new_adapter.load(model_name, quantize=configured_quantize, model_path=configured_model_path)
+        new_adapter.set_low_ram(low_ram_mode)
         model_adapter = new_adapter
     else:
         # Fallback: try to guess based on standard names or fail
@@ -394,7 +427,8 @@ def load_model(model_name: str):
         # Actually, let's error if we can't determine type, or assume Flux as generic
         if "flux" in model_name.lower():
              new_adapter = FluxAdapter()
-             new_adapter.load(model_name, model_path=configured_model_path)
+             new_adapter.load(model_name, quantize=configured_quantize, model_path=configured_model_path)
+             new_adapter.set_low_ram(low_ram_mode)
              model_adapter = new_adapter
         else:
             raise ValueError(f"Unknown model type for: {model_name}")
@@ -469,6 +503,18 @@ def main():
 
     args = parser.parse_args()
     configured_model_path = args.model_path
+    configured_quantize = args.quantize
+
+    # Set cache limit if provided
+    if args.cache_limit > 0:
+        _set_mlx_cache_limit(args.cache_limit)
+        logger.info(f"MLX cache limit set to {args.cache_limit} bytes")
+
+    # Set global low-ram mode
+    global low_ram_mode
+    low_ram_mode = args.low_ram
+    if low_ram_mode:
+        logger.info("Low-RAM mode enabled")
 
     logger.info("No model loaded at startup. Use API to load a model.")
 

@@ -83,9 +83,9 @@ The original generic server implementation has been moved to `server_generic.py`
 
 ## Client Compatibility
 
-**Important:** The existing clients in the `clients/` directory (`web-ui`, `gradio-ui`, `mflux_client.py`) are designed for the legacy generic server API and **will not work** with this new MVP server.
+The official web client is located in `clients/web-ui`. It is fully compatible with this MVP server and provides a modern interface for image generation.
 
-This MVP server uses an OpenAI-compatible API schema (`/v1/images/generations`). You can use standard OpenAI client libraries to interact with it.
+This MVP server also uses an OpenAI-compatible API schema (`/v1/images/generations`). You can use standard OpenAI client libraries to interact with it.
 
 ### Example Python Client
 

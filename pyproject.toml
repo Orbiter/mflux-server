@@ -6,11 +6,9 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "mflux==0.14.2",
     "flask",
-    "flask-restx",
     "flask-cors",
     "protobuf>=4.25.0",
     "pillow",
-    "requests",
 ]
 
 [project.optional-dependencies]

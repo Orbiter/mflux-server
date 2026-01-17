@@ -4,15 +4,11 @@ This API server is designed for asynchronous image generation tasks with [mflux]
 
 ## Examples
 
-Here are two different client applications that use the server API. The first one is the default web-frontend which is available at `http://localhost:4030`
+The official web-frontend is available at `http://localhost:4030`
 
 ![Screenshot of mflux Image Generator Web Front-end](clients/web-ui/screenshot.png)
 
-The second screenshot shows the Gradio Front-End:
-
-![Screenshot of mflux Image Generator Gradio Front-end](clients/gradio-ui/screenshot.png)
-
-Code for both client applications is located in the `clients` subdirectory.
+Code for the client application is located in the `clients` subdirectory.
 
 ## Features
 
@@ -101,71 +97,6 @@ curl -X 'GET' \
 This returns the jpeg binary and removes the image from the production queue.
 
 There are more API endpoints to list the queue and delete entries from the queue, see swagger documentation for details.
-
-## python client (quick example)
-
-Here are three functions which implement a client endpoint for the image generation process as shown above with curl:
-
-```
-def mflux_generate_client(mfluxendpoint, prompt, width=1280, height=720, steps=4, seed=None, format="JPEG", quality=85, priority=False):
-    data = {
-        "prompt": prompt,
-        "height": height,
-        "width": width,
-        "steps": steps,
-        "format": format,
-        "quality": quality,
-        "priority": priority
-    }
-    if seed is not None:
-        data["seed"] = seed
-    response = requests.post(mfluxendpoint + "/api/generate", json=data)
-    # parse the response and get the task_id
-    json = response.json()
-    task_id = json["task_id"]
-    return task_id
-    
-def mflux_status_ready(mfluxendpoint, task_id):
-    response = requests.get(mfluxendpoint + "/api/status?task_id=" + task_id)
-    if response.status_code == 200:
-        status = response.json()["status"]
-        if status == "done":
-            return 0
-        else:
-            # read the waiting time
-            waiting_time = response.json().get("wait_remaining", 1)
-            if waiting_time < 1: waiting_time = 1
-            return waiting_time
-    else:
-        return -1
-
-def mflux_get_image(mfluxendpoint, task_id):
-    response = requests.get(mfluxendpoint + "/api/image?task_id=" + task_id + "&base64=false&delete=true")
-    if response.status_code == 200:
-        return response.content
-    else:
-        return None
-```
-
-The mfluxendpoint would be a string like `http://localhost:4030`. 
-A single function which uses the client endpoints above to get an image can be i.e.:
-
-```
-def generate_image(mfluxendpoint, prompt, width=1280, height=720, steps=4):
-    startt = time.time()
-    task_id = mflux_generate_client(mfluxendpoint, prompt, width=width, height=height, steps=steps)
-    for i in range(10000):
-        waiting_time = mflux_status_ready(mfluxendpoint, task_id)
-        print("Waiting time: ", waiting_time, " seconds")
-        if waiting_time == 0: break
-        nextsleep = max(min(waiting_time / 4, 10), 1)
-        time.sleep(nextsleep)
-    imageb = mflux_get_image(mfluxendpoint, task_id)    
-    stopt = time.time()
-    print("Time taken: ", stopt - startt, " seconds")
-    image = Image.open(BytesIO(imageb))
-    return image
-```
 
 ## License
 

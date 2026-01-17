@@ -30,6 +30,11 @@ sys.modules['mflux.models.fibo.variants'] = mock_mflux_module
 sys.modules['mflux.models.fibo.variants.txt2img'] = mock_mflux_module
 sys.modules['mflux.models.fibo.variants.txt2img.fibo'] = mock_mflux_module
 
+# Mock common modules used by adapters
+sys.modules['mflux.models.common'] = mock_mflux_module
+sys.modules['mflux.models.common.vae'] = mock_mflux_module
+sys.modules['mflux.models.common.vae.tiling_config'] = mock_mflux_module
+
 # 2. Import server modules
 with patch.dict('sys.modules', sys.modules):
     import server

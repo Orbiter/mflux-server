@@ -5,6 +5,7 @@ import os
 import random
 from PIL import Image
 import mlx.core as mx
+from mflux.models.common.vae.tiling_config import TilingConfig
 
 # Import the model classes
 from mflux.models.z_image.variants.turbo.z_image_turbo import ZImageTurbo
@@ -23,6 +24,13 @@ class ModelAdapter(ABC):
     def load(self, model_name: str, quantize: Optional[int] = None, model_path: Optional[str] = None):
         """
         Load the model into memory.
+        """
+        pass
+
+    @abstractmethod
+    def set_low_ram(self, enabled: bool):
+        """
+        Enable or disable low-ram mode (VAE tiling).
         """
         pass
 
@@ -58,16 +66,9 @@ class ZImageTurboAdapter(ModelAdapter):
         final_model_path = model_path
         if model_path:
              # Known mappings for ZImageTurbo
-             # If the user passed a base path, we might need to append the model ID
-             # But here, we'll assume if it's passed, it's either the full path or a base path.
-             # Let's try to be smart: if the path ends with the model name, use it.
-             # If not, and it's a directory, look for the model.
-             # For MVP, we'll follow the pattern from server_generic.py logic slightly:
-             # If "z-image-turbo" is the requested model, and model_path is given,
-             # we check if {model_path}/filipstrand/Z-Image-Turbo-mflux-4bit exists.
-
              # Check common Z-Image paths
              candidates = [
+                 os.path.join(model_path, model_name), # Prioritize exact model name match
                  os.path.join(model_path, "filipstrand/Z-Image-Turbo-mflux-4bit"),
                  os.path.join(model_path, "filipstrand/Z-Image-Turbo-mflux-8bit"), # Fallback if quantized differs?
                  model_path # Assume it's the direct path
@@ -79,8 +80,40 @@ class ZImageTurboAdapter(ModelAdapter):
                      print(f"Resolved model path to: {final_model_path}")
                      break
 
-        self.model = ZImageTurbo(quantize=quantize, model_path=final_model_path)
-        print(f"Loaded ZImageTurbo model: {model_name}")
+        # Auto-detect quantization from model name if not provided
+        if quantize is None:
+            if "4bit" in model_name:
+                quantize = 4
+            elif "8bit" in model_name:
+                quantize = 8
+
+        try:
+            self.model = ZImageTurbo(quantize=quantize, model_path=final_model_path)
+            print(f"Loaded ZImageTurbo model: {model_name} (Quantize: {quantize})")
+        except Exception as e:
+            print(f"Error loading ZImageTurbo model from {final_model_path}: {e}")
+            if final_model_path and os.path.exists(final_model_path):
+                print(f"Directory contents of {final_model_path}:")
+                try:
+                    for root, dirs, files in os.walk(final_model_path):
+                        level = root.replace(final_model_path, '').count(os.sep)
+                        indent = ' ' * 4 * (level)
+                        print(f"{indent}{os.path.basename(root)}/")
+                        subindent = ' ' * 4 * (level + 1)
+                        for f in files:
+                            print(f"{subindent}{f}")
+                except Exception as list_e:
+                    print(f"Could not list directory: {list_e}")
+            raise e
+
+    def set_low_ram(self, enabled: bool):
+        if not self.model:
+            return
+        if enabled:
+            self.model.tiling_config = TilingConfig()
+            print("Low-RAM mode enabled: VAE tiling active")
+        else:
+            self.model.tiling_config = None
 
     def generate(self, prompt: str, **kwargs) -> Image.Image:
         if not self.model:
@@ -143,6 +176,7 @@ class QwenAdapter(ModelAdapter):
         if model_path:
             # Check for common Qwen structures if base path provided
             candidates = [
+                os.path.join(model_path, model_name),
                 os.path.join(model_path, "Qwen/Qwen-Image"),
                 os.path.join(model_path, "filipstrand/Qwen-Image-mflux-6bit"),
                 model_path
@@ -153,10 +187,30 @@ class QwenAdapter(ModelAdapter):
                     print(f"Resolved Qwen model path to: {final_model_path}")
                     break
 
+        # Auto-detect quantization
+        if quantize is None:
+            if "4bit" in model_name:
+                quantize = 4
+            elif "8bit" in model_name:
+                quantize = 8
+
         # QwenImage doesn't have from_name, requires direct instantiation
         # Will default to huggingface if path is None
-        self.model = QwenImage(quantize=quantize, model_path=final_model_path)
-        print(f"Loaded Qwen model: {model_name} (Path: {final_model_path or hf_model_name})")
+        try:
+            self.model = QwenImage(quantize=quantize, model_path=final_model_path)
+            print(f"Loaded Qwen model: {model_name} (Path: {final_model_path or hf_model_name}, Quantize: {quantize})")
+        except Exception as e:
+            print(f"Error loading Qwen model: {e}")
+            raise e
+
+    def set_low_ram(self, enabled: bool):
+        if not self.model:
+            return
+        if enabled:
+            self.model.tiling_config = TilingConfig()
+            print("Low-RAM mode enabled: VAE tiling active")
+        else:
+            self.model.tiling_config = None
 
     def generate(self, prompt: str, **kwargs) -> Image.Image:
         if not self.model:
@@ -211,6 +265,7 @@ class FIBOAdapter(ModelAdapter):
         final_model_path = model_path
         if model_path:
             candidates = [
+                os.path.join(model_path, model_name),
                 os.path.join(model_path, "briaai/FIBO"),
                 os.path.join(model_path, "briaai/Fibo-mlx-4bit"),
                 os.path.join(model_path, "briaai/Fibo-mlx-8bit"),
@@ -222,8 +277,28 @@ class FIBOAdapter(ModelAdapter):
                     print(f"Resolved FIBO model path to: {final_model_path}")
                     break
 
-        self.model = FIBO(quantize=quantize, model_path=final_model_path)
-        print(f"Loaded FIBO model: {model_name} (Path: {final_model_path or hf_model_name})")
+        # Auto-detect quantization
+        if quantize is None:
+            if "4bit" in model_name:
+                quantize = 4
+            elif "8bit" in model_name:
+                quantize = 8
+
+        try:
+            self.model = FIBO(quantize=quantize, model_path=final_model_path)
+            print(f"Loaded FIBO model: {model_name} (Path: {final_model_path or hf_model_name}, Quantize: {quantize})")
+        except Exception as e:
+            print(f"Error loading FIBO model: {e}")
+            raise e
+
+    def set_low_ram(self, enabled: bool):
+        if not self.model:
+            return
+        if enabled:
+            self.model.tiling_config = TilingConfig()
+            print("Low-RAM mode enabled: VAE tiling active")
+        else:
+            self.model.tiling_config = None
 
     def generate(self, prompt: str, **kwargs) -> Image.Image:
         if not self.model:
@@ -286,6 +361,7 @@ class FluxAdapter(ModelAdapter):
             # Check for common Flux structures if base path provided
             # Standard mflux structure often mirrors HF org/repo
             candidates = [
+                os.path.join(model_path, model_name),
                 os.path.join(model_path, hf_model_name),
                 model_path
             ]
@@ -302,13 +378,29 @@ class FluxAdapter(ModelAdapter):
         # However, Flux1 constructor takes 'model_path' as the location of weights.
         # If we want to load from HF cache by name, we might need to use from_name IF model_path is None.
 
+        # Auto-detect quantization
+        if quantize is None:
+            if "4bit" in model_name:
+                quantize = 4
+            elif "8bit" in model_name:
+                quantize = 8
+
         if final_model_path:
              self.model = Flux1(quantize=quantize, model_path=final_model_path)
         else:
              # Fallback to from_name for HF cache loading
              self.model = Flux1.from_name(model_name=hf_model_name, quantize=quantize)
 
-        print(f"Loaded Flux model: {model_name} (ID: {hf_model_name})")
+        print(f"Loaded Flux model: {model_name} (ID: {hf_model_name}, Quantize: {quantize})")
+
+    def set_low_ram(self, enabled: bool):
+        if not self.model:
+            return
+        if enabled:
+            self.model.tiling_config = TilingConfig()
+            print("Low-RAM mode enabled: VAE tiling active")
+        else:
+            self.model.tiling_config = None
 
     def generate(self, prompt: str, **kwargs) -> Image.Image:
         if not self.model:
