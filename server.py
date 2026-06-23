@@ -25,6 +25,7 @@ from mflux.models.flux.variants.txt2img.flux import Flux1
 from mflux.models.qwen.variants.txt2img.qwen_image import QwenImage
 from mflux.models.fibo.variants.txt2img.fibo import FIBO
 from mflux.models.flux2.variants.txt2img.flux2_klein import Flux2Klein
+from mflux.models.ernie_image import ErnieImage
 from mflux.models.z_image.variants.z_image import ZImage
 
 import requests
@@ -78,9 +79,11 @@ model_instance = None # the model object, initialized in main()
 pixels = 1024 * 1024  # the number of pixels in all of the computed images (start value)
 ctime = 80            # the total computation time for all images in seconds (start value)
 metal_cache_limit = 0 # the cache limit for the metal library
-model = "black-forest-labs/FLUX.2-klein-9B" # default model
+model = "baidu/ERNIE-Image-Turbo" # default model
 model_quantize = None # quantization level in use
 model_lock = threading.Lock()
+model_load_requests = []
+model_worker_thread = None
 MODEL_REGISTRY = {
     "dev": {"loader": "flux", "steps": 25},
     "dhairyashil/FLUX.1-dev-mflux-4bit": {"loader": "flux", "steps": 25},
@@ -98,12 +101,23 @@ MODEL_REGISTRY = {
     "flux2-klein-9b": {"loader": "flux2", "steps": 4},
     "black-forest-labs/FLUX.2-klein-9B": {"loader": "flux2", "steps": 4},
     "flux2-klein-4b": {"loader": "flux2", "steps": 4},
-    "black-forest-labs/FLUX.2-klein-4B": {"loader": "flux2", "steps": 4}
+    "black-forest-labs/FLUX.2-klein-4B": {"loader": "flux2", "steps": 4},
+    "ernie-image-turbo": {"loader": "ernie", "steps": 8, "guidance": 1.0},
+    "baidu/ERNIE-Image-Turbo": {"loader": "ernie", "steps": 8, "guidance": 1.0},
+    "ernie-image": {"loader": "ernie", "steps": 50, "guidance": 4.0},
+    "baidu/ERNIE-Image": {"loader": "ernie", "steps": 50, "guidance": 4.0}
 }
 
 FLUX2_NAME_MAP = {
     "black-forest-labs/flux.2-klein-9b": "flux2-klein-9b",
     "black-forest-labs/flux.2-klein-4b": "flux2-klein-4b"
+}
+
+ERNIE_CONFIG_MAP = {
+    "ernie-image-turbo": ModelConfig.ernie_image_turbo,
+    "baidu/ernie-image-turbo": ModelConfig.ernie_image_turbo,
+    "ernie-image": ModelConfig.ernie_image,
+    "baidu/ernie-image": ModelConfig.ernie_image
 }
 
 def _normalize_flux2_model_name(model_name: str) -> str:
@@ -131,6 +145,15 @@ def load_model(model_name: str, quantize: int | None):
         return QwenImage(quantize=effective_quantize, model_path=model_path)
     if loader == "fibo":
         return FIBO(quantize=effective_quantize, model_path=model_path)
+    if loader == "ernie":
+        model_config_factory = ERNIE_CONFIG_MAP.get(model_name.lower())
+        if model_config_factory is None:
+            raise ValueError(f"Unknown ERNIE model '{model_name}'")
+        return ErnieImage(
+            model_config=model_config_factory(),
+            quantize=effective_quantize,
+            model_path=model_path,
+        )
     if loader == "z-image":
         return ZImage(
             model_config=ModelConfig.from_name(model_name="z-image-turbo"),
@@ -149,6 +172,8 @@ def generate_with_model(instance, model_name: str, task, init_image_path):
             json.loads(prompt)
         except json.JSONDecodeError:
             prompt = json.dumps({"prompt": prompt})
+    if info.get("loader") == "ernie":
+        guidance = task['guidance'] or info.get("guidance", 1.0)
     common_kwargs = {
         "seed": int(task['seed']),
         "prompt": prompt,
@@ -162,7 +187,7 @@ def generate_with_model(instance, model_name: str, task, init_image_path):
         return instance.generate_image(**common_kwargs)
     return instance.generate_image(**common_kwargs, guidance=guidance)
 
-def load_model_runtime(model_name: str, quantize: int | None):
+def _load_model_runtime_now(model_name: str, quantize: int | None):
     global model_instance, model, model_quantize
     if model_name not in MODEL_REGISTRY:
         raise ValueError(f"Unknown model '{model_name}'")
@@ -195,6 +220,40 @@ def load_model_runtime(model_name: str, quantize: int | None):
         model_quantize = effective_quantize
         model_instance = loaded_instance
 
+
+def load_model_runtime(model_name: str, quantize: int | None):
+    if threading.current_thread() is model_worker_thread:
+        _load_model_runtime_now(model_name, quantize)
+        return
+
+    done = threading.Event()
+    request = {
+        "model": model_name,
+        "quantize": quantize,
+        "done": done,
+        "error": None
+    }
+    with model_lock:
+        model_load_requests.append(request)
+    done.wait()
+    if request["error"]:
+        raise request["error"]
+
+
+def _process_model_load_request(worker_stream):
+    with model_lock:
+        request = model_load_requests.pop(0) if model_load_requests else None
+    if request is None:
+        return
+
+    try:
+        with mx.stream(worker_stream):
+            _load_model_runtime_now(request["model"], request["quantize"])
+    except Exception as exc:
+        request["error"] = exc
+    finally:
+        request["done"].set()
+
 # we implement image generation as asynchronous task
 # this will be executed in a separate thread
 def _set_mlx_cache_limit(limit: int) -> None:
@@ -211,10 +270,20 @@ def _clear_mlx_cache() -> None:
         metal_compat.clear_cache()
 
 
+def _new_mlx_worker_stream():
+    try:
+        return mx.new_thread_local_stream(mx.gpu)
+    except AttributeError:
+        return mx.new_stream(mx.gpu)
+
+
 def compute_image_task():
-    global model_instance, tasklist, pixels, ctime
+    global model_instance, tasklist, pixels, ctime, model_worker_thread
+    model_worker_thread = threading.current_thread()
+    worker_stream = _new_mlx_worker_stream()
     # we loop forever and in every iteration we check if there is a task to process
     while True:
+        _process_model_load_request(worker_stream)
         with model_lock:
             current_model_instance = model_instance
             current_model_name = model
@@ -243,7 +312,8 @@ def compute_image_task():
             else:
                 init_image_path = None
 
-            generated_image = generate_with_model(current_model_instance, current_model_name, task, init_image_path)
+            with mx.stream(worker_stream):
+                generated_image = generate_with_model(current_model_instance, current_model_name, task, init_image_path)
 
             # remove the temporary init_image file
             if init_image_path: os.remove(init_image_path)
@@ -295,7 +365,7 @@ task_model = api.model('TaskInput', {
     'height': fields.Integer(description='Image height', default=1024, required=False),
     'width': fields.Integer(description='Image width', default=1024, required=False),
     'steps': fields.Integer(description='Inference Steps', default=MODEL_REGISTRY.get(model, {}).get("steps", 4), required=False),
-    'guidance': fields.Float(description='Guidance Scale', default=3.5, required=False),
+    'guidance': fields.Float(description='Guidance Scale', default=MODEL_REGISTRY.get(model, {}).get("guidance", 3.5), required=False),
     'format': fields.String(description='The image format (JPEG or PNG), default is JPEG', default="JPEG", required=False),
     'quality': fields.Integer(description='JPEG compression quality (1-100) if format is JPEG, default is 85', default=85, required=False),
     'priority': fields.Boolean(description='Set to true to put this task to the head of the queue', default=False, required=False)
@@ -393,7 +463,7 @@ class GenerateImage(Resource):
         height = int(args.get('height', 1024))
         width = int(args.get('width', 1024))
         steps = int(args.get('steps', MODEL_REGISTRY.get(model, {}).get("steps", 4)))
-        guidance = float(args.get('guidance', 3.5))
+        guidance = float(args.get('guidance', MODEL_REGISTRY.get(model, {}).get("guidance", 3.5)))
         format = args.get('format', 'JPEG').upper()
         quality = args.get('quality', 85)
         priority = args.get('priority', False)
@@ -590,13 +660,10 @@ def main():
     parser.add_argument('--cache_limit', type=int, default=0, help='The metal cache limit in bytes')
     args = parser.parse_args()
 
-    global model_quantize
-    global model_instance
     global metal_cache_limit
-    load_model_runtime(args.model, args.quantize)
-
     metal_cache_limit = args.cache_limit
     threading.Thread(target=compute_image_task).start()
+    load_model_runtime(args.model, args.quantize)
     print(f"Server started, view swagger API documentation at http://{args.host}:{args.port}/swagger")
     app.run(host=args.host, port=args.port)
 
