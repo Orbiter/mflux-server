@@ -1,4 +1,4 @@
-mflux==0.18
+mflux==0.18.1
 flask
 flask-restx
 flask-cors

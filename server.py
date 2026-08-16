@@ -20,13 +20,21 @@ from flask import Flask, request, Response, jsonify
 from flask_restx import Api, Resource, fields
 from flask_cors import CORS
 from flask import send_file, redirect
+from huggingface_hub import snapshot_download
 from mflux.models.common.config import ModelConfig
 from mflux.models.flux.variants.txt2img.flux import Flux1
 from mflux.models.qwen.variants.txt2img.qwen_image import QwenImage
+from mflux.models.qwen.model.qwen_vae.qwen_vae import QwenVAE
 from mflux.models.fibo.variants.txt2img.fibo import FIBO
 from mflux.models.flux2.variants.txt2img.flux2_klein import Flux2Klein
 from mflux.models.ernie_image import ErnieImage
+from mflux.models.krea2 import Krea2
+from mflux.models.krea2.weights.krea2_weight_definition import Krea2WeightDefinition
 from mflux.models.z_image.variants.z_image import ZImage
+
+# These class constants contain lazy reshape operations created during import.
+# Materialize them on their owning thread before Qwen/Krea decode on the worker.
+mx.eval(QwenVAE.LATENTS_MEAN, QwenVAE.LATENTS_STD)
 
 import requests
 try:
@@ -79,7 +87,7 @@ model_instance = None # the model object, initialized in main()
 pixels = 1024 * 1024  # the number of pixels in all of the computed images (start value)
 ctime = 80            # the total computation time for all images in seconds (start value)
 metal_cache_limit = 0 # the cache limit for the metal library
-model = "baidu/ERNIE-Image-Turbo" # default model
+model = "ernie-image-turbo" # default model
 model_quantize = None # quantization level in use
 model_lock = threading.Lock()
 model_load_requests = []
@@ -105,7 +113,9 @@ MODEL_REGISTRY = {
     "ernie-image-turbo": {"loader": "ernie", "steps": 8, "guidance": 1.0},
     "baidu/ERNIE-Image-Turbo": {"loader": "ernie", "steps": 8, "guidance": 1.0},
     "ernie-image": {"loader": "ernie", "steps": 50, "guidance": 4.0},
-    "baidu/ERNIE-Image": {"loader": "ernie", "steps": 50, "guidance": 4.0}
+    "baidu/ERNIE-Image": {"loader": "ernie", "steps": 50, "guidance": 4.0},
+    "krea-2-turbo": {"loader": "krea2", "steps": 8, "guidance": 1.0},
+    "krea/Krea-2-Turbo": {"loader": "krea2", "steps": 8, "guidance": 1.0}
 }
 
 FLUX2_NAME_MAP = {
@@ -143,6 +153,19 @@ def load_model(model_name: str, quantize: int | None):
         )
     if loader == "qwen":
         return QwenImage(quantize=effective_quantize, model_path=model_path)
+    if loader == "krea2":
+        model_config = ModelConfig.krea2()
+        # mflux 0.18.1's cache check overlooks the root turbo.safetensors file
+        # when component subdirectories are present. Complete the snapshot first.
+        model_path = snapshot_download(
+            repo_id=model_config.model_name,
+            allow_patterns=Krea2WeightDefinition.get_download_patterns(),
+        )
+        return Krea2(
+            model_config=model_config,
+            quantize=effective_quantize,
+            model_path=model_path,
+        )
     if loader == "fibo":
         return FIBO(quantize=effective_quantize, model_path=model_path)
     if loader == "ernie":
@@ -165,15 +188,13 @@ def load_model(model_name: str, quantize: int | None):
 def generate_with_model(instance, model_name: str, task, init_image_path):
     info = MODEL_REGISTRY.get(model_name, {})
     steps = task['steps'] or MODEL_REGISTRY.get(model_name, {}).get("steps", 4)
-    guidance = task['guidance'] or 3.5
+    guidance = task['guidance'] or info.get("guidance", 3.5)
     prompt = task['prompt']
     if info.get("loader") == "fibo":
         try:
             json.loads(prompt)
         except json.JSONDecodeError:
             prompt = json.dumps({"prompt": prompt})
-    if info.get("loader") == "ernie":
-        guidance = task['guidance'] or info.get("guidance", 1.0)
     common_kwargs = {
         "seed": int(task['seed']),
         "prompt": prompt,
@@ -662,7 +683,7 @@ def main():
 
     global metal_cache_limit
     metal_cache_limit = args.cache_limit
-    threading.Thread(target=compute_image_task).start()
+    threading.Thread(target=compute_image_task, daemon=True).start()
     load_model_runtime(args.model, args.quantize)
     print(f"Server started, view swagger API documentation at http://{args.host}:{args.port}/swagger")
     app.run(host=args.host, port=args.port)

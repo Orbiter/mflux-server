@@ -39,6 +39,20 @@ python3 server.py --quantize 8 --host 0.0.0.0
 
 As a convenience script, you can instead just run `run.sh` which does all of that automatically.
 
+Krea 2 Turbo uses mflux's dedicated `Krea2` loader and defaults to 8 steps and
+guidance 1.0. Start it with either `--model krea-2-turbo` or
+`--model krea/Krea-2-Turbo`, for example:
+
+```sh
+python3 server.py --model krea-2-turbo --quantize 8 --host 0.0.0.0
+```
+
+The first load downloads the Krea weights (about 33 GB, including the text encoder
+and VAE), even when quantization is enabled. Existing cached files are reused.
+Before loading Krea, the server completes its Hugging Face snapshot, including
+`turbo.safetensors` and tokenizer files that may be missing from an earlier
+download with another loader. There is no need to delete the cache.
+
 The server then runs on port 4030 by default. Host and port can be configured by call parameters, try `server.py --help`.
 To see the swagger documentation, open `http://localhost:4030/swagger`
 
