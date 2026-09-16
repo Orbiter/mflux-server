@@ -30,6 +30,10 @@ from mflux.models.flux2.variants.txt2img.flux2_klein import Flux2Klein
 from mflux.models.ernie_image import ErnieImage
 from mflux.models.krea2 import Krea2
 from mflux.models.krea2.weights.krea2_weight_definition import Krea2WeightDefinition
+from mflux.models.ideogram4 import Ideogram4
+from mflux.models.ideogram4.latent_creator import Ideogram4LatentCreator
+from mflux.models.ideogram4.model.ideogram4_scheduler import Ideogram4Scheduler
+from mflux.models.ideogram4.model.ideogram4_text_encoder import Ideogram4PromptEncoder
 from mflux.models.z_image.variants.z_image import ZImage
 
 # These class constants contain lazy reshape operations created during import.
@@ -92,6 +96,10 @@ model_quantize = None # quantization level in use
 model_lock = threading.Lock()
 model_load_requests = []
 model_worker_thread = None
+IDEOGRAM4_DEFAULT_PRESET = "V4_DEFAULT_20"
+IDEOGRAM4_PRESETS = {
+    name: preset.num_steps for name, preset in Ideogram4Scheduler.PRESETS.items()
+}
 MODEL_REGISTRY = {
     "dev": {"loader": "flux", "steps": 25},
     "dhairyashil/FLUX.1-dev-mflux-4bit": {"loader": "flux", "steps": 25},
@@ -114,8 +122,19 @@ MODEL_REGISTRY = {
     "baidu/ERNIE-Image-Turbo": {"loader": "ernie", "steps": 8, "guidance": 1.0},
     "ernie-image": {"loader": "ernie", "steps": 50, "guidance": 4.0},
     "baidu/ERNIE-Image": {"loader": "ernie", "steps": 50, "guidance": 4.0},
+    "krea2": {"loader": "krea2", "steps": 8, "guidance": 1.0},
+    "krea-2": {"loader": "krea2", "steps": 8, "guidance": 1.0},
     "krea-2-turbo": {"loader": "krea2", "steps": 8, "guidance": 1.0},
-    "krea/Krea-2-Turbo": {"loader": "krea2", "steps": 8, "guidance": 1.0}
+    "krea/Krea-2-Turbo": {"loader": "krea2", "steps": 8, "guidance": 1.0},
+    **{
+        name: {
+            "loader": "ideogram4",
+            "steps": IDEOGRAM4_PRESETS[IDEOGRAM4_DEFAULT_PRESET],
+            "preset": IDEOGRAM4_DEFAULT_PRESET,
+            "presets": IDEOGRAM4_PRESETS,
+        }
+        for name in ("ideogram4", "ideogram-4-fp8", "ideogram-ai/ideogram-4-fp8")
+    },
 }
 
 FLUX2_NAME_MAP = {
@@ -153,6 +172,12 @@ def load_model(model_name: str, quantize: int | None):
         )
     if loader == "qwen":
         return QwenImage(quantize=effective_quantize, model_path=model_path)
+    if loader == "ideogram4":
+        return Ideogram4(
+            model_config=ModelConfig.ideogram4_fp8(),
+            quantize=effective_quantize,
+            model_path=model_path,
+        )
     if loader == "krea2":
         model_config = ModelConfig.krea2()
         # mflux 0.18.1's cache check overlooks the root turbo.safetensors file
@@ -187,6 +212,18 @@ def load_model(model_name: str, quantize: int | None):
 
 def generate_with_model(instance, model_name: str, task, init_image_path):
     info = MODEL_REGISTRY.get(model_name, {})
+    if info.get("loader") == "ideogram4":
+        if init_image_path is not None:
+            raise ValueError("Ideogram 4 does not support init_image (image-to-image generation).")
+        # Passing steps would replace the preset's per-step guidance schedule.
+        return instance.generate_image(
+            seed=int(task['seed']),
+            prompt=task['prompt'],
+            height=task['height'],
+            width=task['width'],
+            preset=task.get('preset', IDEOGRAM4_DEFAULT_PRESET),
+            strict_caption_validation=task.get('strict_caption_validation', False),
+        )
     steps = task['steps'] or MODEL_REGISTRY.get(model_name, {}).get("steps", 4)
     guidance = task['guidance'] or info.get("guidance", 3.5)
     prompt = task['prompt']
@@ -381,12 +418,14 @@ def str_to_bool(value):
 # generate image endpoint
 
 task_model = api.model('TaskInput', {
-    'prompt': fields.String(description='The textual description of the image to generate.', default='A beautiful landscape', required=True),
+    'prompt': fields.String(description='The textual description, or a JSON caption encoded as a string for Ideogram 4.', default='A beautiful landscape', required=True),
     'seed': fields.String(description='Entropy Seed', default=str(int(time.time())), required=False),
     'height': fields.Integer(description='Image height', default=1024, required=False),
     'width': fields.Integer(description='Image width', default=1024, required=False),
-    'steps': fields.Integer(description='Inference Steps', default=MODEL_REGISTRY.get(model, {}).get("steps", 4), required=False),
-    'guidance': fields.Float(description='Guidance Scale', default=MODEL_REGISTRY.get(model, {}).get("guidance", 3.5), required=False),
+    'steps': fields.Integer(description='Inference Steps (ignored by Ideogram 4; use preset)', default=MODEL_REGISTRY.get(model, {}).get("steps", 4), required=False),
+    'guidance': fields.Float(description='Guidance Scale (ignored by Ideogram 4; use preset)', default=MODEL_REGISTRY.get(model, {}).get("guidance", 3.5), required=False),
+    'preset': fields.String(description='Ideogram 4 sampler preset', enum=list(IDEOGRAM4_PRESETS), default=IDEOGRAM4_DEFAULT_PRESET, required=False),
+    'strict_caption_validation': fields.Boolean(description='Reject Ideogram 4 caption warnings before queuing', default=False, required=False),
     'format': fields.String(description='The image format (JPEG or PNG), default is JPEG', default="JPEG", required=False),
     'quality': fields.Integer(description='JPEG compression quality (1-100) if format is JPEG, default is 85', default=85, required=False),
     'priority': fields.Boolean(description='Set to true to put this task to the head of the queue', default=False, required=False)
@@ -431,7 +470,8 @@ class GetSettings(Resource):
             "model": model,
             "quantize": model_quantize,
             "cache_limit": metal_cache_limit,
-            "default_steps": MODEL_REGISTRY.get(model, {}).get("steps", 4)
+            "default_steps": MODEL_REGISTRY.get(model, {}).get("steps", 4),
+            "default_preset": MODEL_REGISTRY.get(model, {}).get("preset")
         })
 
 @api.route('/load')
@@ -460,13 +500,15 @@ class LoadModel(Resource):
         return {
             "model": model,
             "quantize": model_quantize,
-            "default_steps": MODEL_REGISTRY.get(model, {}).get("steps", 4)
+            "default_steps": MODEL_REGISTRY.get(model, {}).get("steps", 4),
+            "default_preset": MODEL_REGISTRY.get(model, {}).get("preset")
         }
     
 @api.route('/generate')
 class GenerateImage(Resource):
     @api.expect(task_model, validate=True)
     @api.response(200, 'Success', generate_response_model)
+    @api.response(400, 'Invalid generation parameters')
     @api.response(404, 'Cannot append task')
     def post(self):
         """
@@ -491,6 +533,24 @@ class GenerateImage(Resource):
         with model_lock:
             model_at_submit = model
             quantize_at_submit = model_quantize
+
+        preset = args.get('preset', IDEOGRAM4_DEFAULT_PRESET)
+        strict_caption_validation = args.get('strict_caption_validation', False)
+        if MODEL_REGISTRY[model_at_submit].get("loader") == "ideogram4":
+            if args.get('init_image') is not None:
+                return {"error": "Ideogram 4 does not support init_image (image-to-image generation)."}, 400
+            try:
+                Ideogram4LatentCreator.validate_dimensions(width=width, height=height)
+                steps = Ideogram4Scheduler.get_preset(preset).num_steps
+                Ideogram4PromptEncoder.resolve_prompt(
+                    prompt,
+                    strict_caption_validation=strict_caption_validation,
+                    warn_on_caption_issues=False,
+                )
+                int(seed)
+            except ValueError as exc:
+                return {"error": str(exc)}, 400
+            guidance = None  # Guidance is a per-step schedule selected by the preset.
 
         # Decode init_image if it is provided
         init_image = None
@@ -525,6 +585,9 @@ class GenerateImage(Resource):
             'model_at_submit': model_at_submit,
             'quantize_at_submit': quantize_at_submit
         }
+        if MODEL_REGISTRY[model_at_submit].get("loader") == "ideogram4":
+            task_metadata['preset'] = preset
+            task_metadata['strict_caption_validation'] = strict_caption_validation
         
         # compute waiting time based on the number of pixels in the queue
         wait_for_pixels = width * height # include the current task
