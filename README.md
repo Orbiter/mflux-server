@@ -17,27 +17,44 @@ Code for both client applications is located in the `clients` subdirectory.
 ## Features
 
 The API supports features such as:
+
 - Queuing of image generation tasks.
 - Forecasting computation time for better user experience in multi-user environments.
 - Managing task statuses and retrieving generated images.
+- Reporting failed tasks without stopping the worker or retrying them automatically.
 
 Furthermore, the API exposes a swagger endpoint to self-document the server.
 
 ## Example usage
 
-You need a huggingface access token to get the weights from the gated huggingface repository.
-Create a token and then install the huggingface CLI with `pip install huggingface-hub`,
-then log in with `huggingface-cli login` and paste in your access token.
+Use Python 3.12. The server dependencies in `requirements.txt` pin
+`mflux==0.19.2` and require `mlx>=0.32.2,<0.33.0` and
+`protobuf>=4.25.0,<8.0`.
 
-The server can be installed and started with i.e.
-```
-python3 -m venv .venv
+Install the dependencies in a virtual environment:
+
+```sh
+python3.12 -m venv .venv
 source .venv/bin/activate
-pip3 install -r requirements.txt
-python3 server.py --quantize 8 --host 0.0.0.0
+python3.12 -m pip install -r requirements.txt
 ```
 
-As a convenience script, you can instead just run `run.sh` which does all of that automatically.
+For gated Hugging Face models, obtain access to the model repository and log in
+with `hf auth login`, or set `HF_TOKEN`. The Hugging Face CLI is installed with
+the server dependencies. Authentication is separate from starting the server.
+
+```sh
+python3.12 server.py --quantize 8 --host 0.0.0.0
+```
+
+The default model is `ernie-image-turbo`, with 8 inference steps and guidance
+1.0. Select another model with `--model`; `/api/ls` lists supported model names
+and defaults, and `/api/ps` reports the current settings. Without `--host`, the
+server listens on `127.0.0.1`.
+
+Alternatively, `./run.sh --quantize 8` creates or reuses `.venv`, upgrades the
+dependencies within the requirements constraints, and starts the server on
+`0.0.0.0`. It requires Python 3.12 and does not perform Hugging Face login.
 
 ### Krea 2 Turbo
 
@@ -65,12 +82,12 @@ download with another loader. There is no need to delete the cache.
 
 ### Ideogram 4
 
-Ideogram 4 is supported by the pinned `mflux==0.19.1` dependency. Start it with
+Ideogram 4 is supported by the pinned `mflux==0.19.2` dependency. Start it with
 `--model ideogram4`, `--model ideogram-4-fp8`, or
 `--model ideogram-ai/ideogram-4-fp8`:
 
 ```sh
-python3 server.py --model ideogram4 --quantize 4 --host 0.0.0.0
+python3.12 server.py --model ideogram4 --quantize 4 --host 0.0.0.0
 ```
 
 Before the first load, request access to
@@ -136,17 +153,19 @@ caption into the prompt box; generation uses the default 20-step preset.
 
 ### API workflow
 
-The server then runs on port 4030 by default. Host and port can be configured by call parameters, try `server.py --help`.
+The server runs on port 4030 by default. Host and port can be configured with
+`--host` and `--port`; run `python3.12 server.py --help` for all options.
 To see the swagger documentation, open `http://localhost:4030/swagger`
 
 To produce an image, the usual workflow is:
+
 - `/api/generate` to initialize the generation, this returns a `task_id`
-- `/api/status` to check if the image generation has finished. If not, this also returns an approximated waiting time which can be used in a front-end to show a progress bar
+- `/api/status` to poll for `waiting`, `done`, or `error`; waiting tasks include an estimated remaining time
 - `/api/image` to retrieve the produced image as soon as the status turns to "done"
 
 In detail - here is a call to generate an image:
 
-```
+```sh
 curl -X 'POST' \
   'http://localhost:4030/api/generate' \
   -H 'accept: application/json' \
@@ -156,44 +175,59 @@ curl -X 'POST' \
   "seed": "1725311496",
   "height": 1024,
   "width": 1024,
-  "steps": 4,
   "format": "JPEG",
   "quality": 85,
   "priority": false
 }'
 ```
 
-The response is then an object i.e. with:
+Omit `steps` and `guidance` to use the selected model's defaults. An example
+response with the default model and `--quantize 8` is:
 
-```
+```json
 {
   "task_id": "1fc9cc4f",
   "task_length": 1,
-  "expected_time_seconds": 146.88675427253082
+  "expected_time_seconds": 146.88675427253082,
+  "model": "ernie-image-turbo",
+  "quantize": 8
 }
-````
+```
 
 The `task_id` can then be used to check the image generation status:
 
-```
+```sh
 curl -X 'GET' \
   'http://localhost:4030/api/status?task_id=1fc9cc4f' \
   -H 'accept: application/json'
 ```
 
-a response would be i.e.:
-```
+An example response is:
+
+```json
 {
   "pos": 0,
   "status": "waiting",
   "wait_remaining": 15
 }
 ```
-... which means that the image is not ready and is expected to be ready in 15 second. The position is 0 which means that no other image is in queue before.
+The image is expected to be ready in 15 seconds. Position 0 means that no other
+pending task precedes it. Completed and failed tasks do not count toward the
+position or estimated waiting time.
+
+If generation fails, `/api/status` returns HTTP 200 with
+`{"status": "error", "error": "..."}`. Stop polling that task and display the
+error. Failed tasks are not retried and do not delay subsequent tasks; they can
+be removed with `GET /api/cancel?task_id=...` or `GET /api/clear` (all tasks).
+Generation and image encoding exceptions mark the task as failed; cleanup
+exceptions are logged without changing a successfully generated result.
+In either case, the worker continues with the next pending task. The web,
+Gradio, and Python clients stop polling on `error`. An unknown task ID returns
+HTTP 404.
 
 Finally, the image can be retrieved with:
 
-```
+```sh
 curl -X 'GET' \
   'http://localhost:4030/api/image?task_id=1fc9cc4f' \
   -H 'accept: application/json'
@@ -203,24 +237,33 @@ This returns the jpeg binary and removes the image from the production queue.
 
 There are more API endpoints to list the queue and delete entries from the queue, see swagger documentation for details.
 
-## python client (quick example)
+## Python client (quick example)
 
 Here are three functions which implement a client endpoint for the image generation process as shown above with curl:
 
-```
-def mflux_generate_client(mfluxendpoint, prompt, width=1280, height=720, steps=4, seed=None, format="JPEG", quality=85, priority=False):
+```python
+import time
+from io import BytesIO
+
+import requests
+from PIL import Image
+
+
+def mflux_generate_client(mfluxendpoint, prompt, width=1280, height=720, steps=None, seed=None, format="JPEG", quality=85, priority=False):
     data = {
         "prompt": prompt,
         "height": height,
         "width": width,
-        "steps": steps,
         "format": format,
         "quality": quality,
         "priority": priority
     }
+    if steps is not None:
+        data["steps"] = steps
     if seed is not None:
-        data["seed"] = seed
+        data["seed"] = str(seed)
     response = requests.post(mfluxendpoint + "/api/generate", json=data)
+    response.raise_for_status()
     # parse the response and get the task_id
     json = response.json()
     task_id = json["task_id"]
@@ -228,31 +271,25 @@ def mflux_generate_client(mfluxendpoint, prompt, width=1280, height=720, steps=4
     
 def mflux_status_ready(mfluxendpoint, task_id):
     response = requests.get(mfluxendpoint + "/api/status?task_id=" + task_id)
-    if response.status_code == 200:
-        status = response.json()["status"]
-        if status == "done":
-            return 0
-        else:
-            # read the waiting time
-            waiting_time = response.json().get("wait_remaining", 1)
-            if waiting_time < 1: waiting_time = 1
-            return waiting_time
-    else:
-        return -1
+    response.raise_for_status()
+    result = response.json()
+    if result["status"] == "done":
+        return 0
+    if result["status"] == "error":
+        raise RuntimeError(result.get("error", "Image generation failed."))
+    return max(result.get("wait_remaining", 1), 1)
 
 def mflux_get_image(mfluxendpoint, task_id):
     response = requests.get(mfluxendpoint + "/api/image?task_id=" + task_id + "&base64=false&delete=true")
-    if response.status_code == 200:
-        return response.content
-    else:
-        return None
+    response.raise_for_status()
+    return response.content
 ```
 
 The mfluxendpoint would be a string like `http://localhost:4030`. 
 A single function which uses the client endpoints above to get an image can be i.e.:
 
-```
-def generate_image(mfluxendpoint, prompt, width=1280, height=720, steps=4):
+```python
+def generate_image(mfluxendpoint, prompt, width=1280, height=720, steps=None):
     startt = time.time()
     task_id = mflux_generate_client(mfluxendpoint, prompt, width=width, height=height, steps=steps)
     for i in range(10000):
@@ -261,12 +298,28 @@ def generate_image(mfluxendpoint, prompt, width=1280, height=720, steps=4):
         if waiting_time == 0: break
         nextsleep = max(min(waiting_time / 4, 10), 1)
         time.sleep(nextsleep)
+    else:
+        raise TimeoutError("Image generation did not finish within the polling limit.")
     imageb = mflux_get_image(mfluxendpoint, task_id)    
     stopt = time.time()
     print("Time taken: ", stopt - startt, " seconds")
     image = Image.open(BytesIO(imageb))
     return image
 ```
+
+## Development checks
+
+Run the tests with the project virtual environment:
+
+```sh
+.venv/bin/python3.12 -m pip check
+.venv/bin/python3.12 -m unittest discover -s tests -v
+```
+
+The tests mock model loading and inference and do not download model weights.
+Importing `server.py` still initializes MLX, so the test environment needs an
+accessible GPU backend. On macOS, a sandbox without Metal access cannot run
+the full suite directly.
 
 ## License
 

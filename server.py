@@ -350,66 +350,61 @@ def compute_image_task():
             time.sleep(1)
             continue
         
-        # loop through the tasklist and get the first task which has no image assigned
-        foundimage = False
+        # Process each pending task once, including tasks that fail.
+        processed_task = False
         for task in tasklist:
-            if 'image' in task: continue          
+            if 'image' in task or 'error' in task: continue
             # found a task without image
             compute_time = time.time()
             task['compute_time'] = compute_time
-            # generate the image
-            _set_mlx_cache_limit(metal_cache_limit)
-            init_image = task['init_image']
             task['model_used'] = current_model_name
             task['quantize_used'] = current_model_quantize
-            
-            # make a temporary file path for the init_image
-            if init_image:
-                init_image_path = Path(f"/tmp/init_image_{task['task_id']}.png")
-                init_image.save(str(init_image_path))
-            else:
-                init_image_path = None
+            init_image_path = None
+            generated_image = None
+            encoded_image = None
+            try:
+                _set_mlx_cache_limit(metal_cache_limit)
+                init_image = task['init_image']
+                if init_image:
+                    init_image_path = Path(f"/tmp/init_image_{task['task_id']}.png")
+                    init_image.save(str(init_image_path))
 
-            with mx.stream(worker_stream):
-                generated_image = generate_with_model(current_model_instance, current_model_name, task, init_image_path)
+                with mx.stream(worker_stream):
+                    generated_image = generate_with_model(current_model_instance, current_model_name, task, init_image_path)
+                generation_end_time = time.time()
 
-            # remove the temporary init_image file
-            if init_image_path: os.remove(init_image_path)
-
-            # statistics
-            end_time = time.time()
-            ctime += end_time - compute_time
-            pixels += task['height'] * task['width']
-            
-            # convert the image (we do not count this on the computation time on purpose)
-            # we do this here and not during retrieval to save memory in the tasklist
-            format = task.get('format', 'JPEG').upper()
-            if format not in ['PNG', 'JPEG']: format = 'JPEG'
-            if format == 'PNG':
-                png_image = io.BytesIO()
-                generated_image.image.save(png_image, format='PNG')
-                png_image.seek(0)
-                task['image'] = png_image
-                del png_image
-            else:
-                quality = task['quality']
-                jpeg_image = io.BytesIO()
-                generated_image.image.save(jpeg_image, format='JPEG', quality=quality)
-                jpeg_image.seek(0)
-                task['image'] = jpeg_image
-                del jpeg_image
-                
-            # Free resources
-            del generated_image
-            _clear_mlx_cache()
-            gc.collect()
-            
-            task['end_time'] = end_time # end time of the task
-            foundimage = True
+                # Encode before publishing the result so encoding failures are task errors too.
+                format = task.get('format', 'JPEG').upper()
+                if format not in ['PNG', 'JPEG']: format = 'JPEG'
+                encoded_image = io.BytesIO()
+                save_kwargs = {'quality': task['quality']} if format == 'JPEG' else {}
+                generated_image.image.save(encoded_image, format=format, **save_kwargs)
+                encoded_image.seek(0)
+                ctime += generation_end_time - compute_time
+                pixels += task['height'] * task['width']
+                task['image'] = encoded_image
+            except Exception as exc:
+                task['error'] = f"{type(exc).__name__}: {exc}"
+                app.logger.exception("Image generation failed for task %s", task['task_id'])
+            finally:
+                task['end_time'] = time.time()
+                del generated_image
+                del encoded_image
+                if init_image_path is not None:
+                    try:
+                        init_image_path.unlink(missing_ok=True)
+                    except Exception:
+                        app.logger.exception("Could not remove init image for task %s", task['task_id'])
+                for cleanup in (_clear_mlx_cache, gc.collect):
+                    try:
+                        cleanup()
+                    except Exception:
+                        app.logger.exception("Cleanup failed for task %s", task['task_id'])
+            processed_task = True
             break
         
         # if we did not found any task without image, we sleep for 1 second
-        if not foundimage: time.sleep(1)
+        if not processed_task: time.sleep(1)
 
 def str_to_bool(value):
     return value.lower() in ['true', '1', 't', 'y', 'yes']
@@ -446,7 +441,7 @@ def count_pixels(index):
     for i in range(index):
         if i >= len(tasklist): break
         task = tasklist[i]
-        if not 'image' in task:
+        if 'image' not in task and 'error' not in task:
             pixels += task['width'] * task['height']
     return pixels
 
@@ -608,7 +603,8 @@ class GenerateImage(Resource):
         }, 200
 
 status_model = api.model('Status', {
-    'status': fields.String(description='Status of the image generation task'),
+    'status': fields.String(description='Status of the image generation task', enum=['waiting', 'done', 'error']),
+    'error': fields.String(description='Failure description when status is error'),
     'pos': fields.Integer(description='Position in queue')
 })
 
@@ -625,14 +621,17 @@ class GetStatus(Resource):
         .. or when the task is done:
         { "status": "done"}
         When the status is "done", the image can be retrieved with the /image endpoint.
+        A failed task returns { "status": "error", "error": "..." } and is not retried.
         If the task / the task_id is unknown, the endpoint returns a 404 status code.
         """
         task_id = request.args.get('task_id', default='')
         c = -1
         for i, task in enumerate(tasklist):
-            if not 'image' in task: c += 1
+            if 'image' not in task and 'error' not in task: c += 1
             if task['task_id'] == task_id:
-                if 'image' in task:
+                if 'error' in task:
+                    return jsonify({'status': 'error', 'error': task['error']})
+                elif 'image' in task:
                     return jsonify({'status': 'done'})
                 else:
                     # compute the remaining time

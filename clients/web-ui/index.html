@@ -601,6 +601,9 @@
                         })
                         .then(function(statusJson) {
                             var status = statusJson["status"];
+                            if (status === "error") {
+                                throw new Error(statusJson["error"] || 'Image generation failed.');
+                            }
                             if (status === "done") {
                                 clearInterval(pollInterval);
                                 // Get the image

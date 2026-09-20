@@ -46,6 +46,8 @@ def generate_one_image(base_url, prompt, out_path="output.jpg"):
         status = get_json(base_url + "/api/status?task_id=" + urllib.parse.quote(task_id))
         if status.get("status") == "done":
             break
+        if status.get("status") == "error":
+            raise RuntimeError(status.get("error", "Image generation failed."))
         wait_seconds = status.get("wait_remaining", 1)
         if wait_seconds < 1:
             wait_seconds = 1

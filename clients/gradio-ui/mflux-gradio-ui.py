@@ -51,6 +51,9 @@ def generate_image_gradio(prompt, width, height, steps, seed, format, quality, p
         status = status_json["status"]
         if status == "done":
             break
+        elif status == "error":
+            yield None, status_json.get("error", "Image generation failed.")
+            return
         else:
             wait_remaining = status_json.get("wait_remaining", 1)
             pos = status_json.get("pos", 0)
@@ -97,4 +100,3 @@ iface = gr.Interface(
 
 # Launch the app
 iface.launch()
-
