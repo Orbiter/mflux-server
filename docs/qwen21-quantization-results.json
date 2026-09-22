@@ -1,0 +1,446 @@
+[
+  {
+    "precision": "bf16",
+    "device": "Apple M1 Ultra",
+    "python": "3.12.14",
+    "macos": "26.6.2",
+    "mflux": "0.20.0",
+    "mlx": "0.32.2",
+    "checkpoint": "b3179ad355be050328e483a9dfdd9e60cd62adfa",
+    "steps": 12,
+    "seed": 42,
+    "guidance": 1.0,
+    "context_cache": true,
+    "allocator_mib": 0,
+    "repeats": 3,
+    "load_s": 4.624896499999522,
+    "cases": [
+      {
+        "name": "text-512",
+        "size": 512,
+        "references": 0,
+        "prompt": "A red ceramic teapot on an old wooden table in a sunlit kitchen. A small green potted plant stands beside the teapot. Soft morning light enters from the left, casting natural shadows across the grain of the wood. A white linen cloth lies folded at the edge of the table, beside a blue cup. In the background are pale yellow walls and a window looking into a quiet garden. Realistic photography with fine ceramic detail and warm, gentle colors.",
+        "warmup_2steps": {
+          "total_s": 4.820521083000131,
+          "encode_s": 0.4523004580005363,
+          "denoise_s": 2.9451857919993927,
+          "decode_s": 1.4230348330002016,
+          "peak_mlx_bytes": 36175414704
+        },
+        "samples": [
+          {
+            "total_s": 15.855937334000373,
+            "encode_s": 0.3594766670003082,
+            "denoise_s": 14.19586816699939,
+            "decode_s": 1.3005925000006755,
+            "peak_mlx_bytes": 36175414744
+          },
+          {
+            "total_s": 15.500726250000298,
+            "encode_s": 0.2555280420001509,
+            "denoise_s": 14.08674741699997,
+            "decode_s": 1.1584507910001776,
+            "peak_mlx_bytes": 36175414744
+          },
+          {
+            "total_s": 15.388180417000513,
+            "encode_s": 0.25032312500025,
+            "denoise_s": 14.058925999999701,
+            "decode_s": 1.0789312920005614,
+            "peak_mlx_bytes": 36175414744
+          }
+        ],
+        "median": {
+          "total_s": 15.500726250000298,
+          "encode_s": 0.2555280420001509,
+          "denoise_s": 14.08674741699997,
+          "decode_s": 1.1584507910001776
+        },
+        "peak_mlx_bytes": 36175414744
+      },
+      {
+        "name": "text-1024",
+        "size": 1024,
+        "references": 0,
+        "prompt": "A red ceramic teapot on an old wooden table in a sunlit kitchen. A small green potted plant stands beside the teapot. Soft morning light enters from the left, casting natural shadows across the grain of the wood. A white linen cloth lies folded at the edge of the table, beside a blue cup. In the background are pale yellow walls and a window looking into a quiet garden. Realistic photography with fine ceramic detail and warm, gentle colors.",
+        "warmup_2steps": {
+          "total_s": 16.499824416000592,
+          "encode_s": 0.25749391600038507,
+          "denoise_s": 10.060905874999662,
+          "decode_s": 6.181424625000545,
+          "peak_mlx_bytes": 46191420708
+        },
+        "samples": [
+          {
+            "total_s": 68.25971891599966,
+            "encode_s": 0.23902091600029962,
+            "denoise_s": 61.63039737500003,
+            "decode_s": 6.390300624999327,
+            "peak_mlx_bytes": 46191420748
+          },
+          {
+            "total_s": 68.54315029200006,
+            "encode_s": 0.25325612500000716,
+            "denoise_s": 61.81414558399956,
+            "decode_s": 6.475748583000495,
+            "peak_mlx_bytes": 46191420748
+          },
+          {
+            "total_s": 68.22518312500051,
+            "encode_s": 0.24513812500026688,
+            "denoise_s": 61.590094999999565,
+            "decode_s": 6.389950000000681,
+            "peak_mlx_bytes": 46191420748
+          }
+        ],
+        "median": {
+          "total_s": 68.25971891599966,
+          "encode_s": 0.24513812500026688,
+          "denoise_s": 61.63039737500003,
+          "decode_s": 6.390300624999327
+        },
+        "peak_mlx_bytes": 46191420748
+      },
+      {
+        "name": "edit2-512",
+        "size": 512,
+        "references": 2,
+        "prompt": "Place the red circle from image 1 to the left of the blue square from image 2, on one clean white background, with both shapes fully visible.",
+        "warmup_2steps": {
+          "total_s": 6.642984250000154,
+          "encode_s": 2.0148644589999094,
+          "denoise_s": 3.077506374999757,
+          "decode_s": 1.5506134160004876,
+          "peak_mlx_bytes": 37279276122
+        },
+        "samples": [
+          {
+            "total_s": 17.645602874999895,
+            "encode_s": 0.999617749999743,
+            "denoise_s": 15.142549749999489,
+            "decode_s": 1.503435375000663,
+            "peak_mlx_bytes": 37279276162
+          },
+          {
+            "total_s": 17.546935415999542,
+            "encode_s": 1.028209041000082,
+            "denoise_s": 15.119322167000064,
+            "decode_s": 1.399404207999396,
+            "peak_mlx_bytes": 37279276162
+          },
+          {
+            "total_s": 17.594384875000287,
+            "encode_s": 1.0020575829994414,
+            "denoise_s": 15.1540715000001,
+            "decode_s": 1.4382557920007457,
+            "peak_mlx_bytes": 37279276162
+          }
+        ],
+        "median": {
+          "total_s": 17.594384875000287,
+          "encode_s": 1.0020575829994414,
+          "denoise_s": 15.142549749999489,
+          "decode_s": 1.4382557920007457
+        },
+        "peak_mlx_bytes": 37279276162
+      }
+    ],
+    "vision_load_s": 1.757957499999975
+  },
+  {
+    "precision": "q8",
+    "device": "Apple M1 Ultra",
+    "python": "3.12.14",
+    "macos": "26.6.2",
+    "mflux": "0.20.0",
+    "mlx": "0.32.2",
+    "checkpoint": "b3179ad355be050328e483a9dfdd9e60cd62adfa",
+    "steps": 12,
+    "seed": 42,
+    "guidance": 1.0,
+    "context_cache": true,
+    "allocator_mib": 0,
+    "repeats": 3,
+    "load_s": 4.633837375000439,
+    "cases": [
+      {
+        "name": "text-512",
+        "size": 512,
+        "references": 0,
+        "prompt": "A red ceramic teapot on an old wooden table in a sunlit kitchen. A small green potted plant stands beside the teapot. Soft morning light enters from the left, casting natural shadows across the grain of the wood. A white linen cloth lies folded at the edge of the table, beside a blue cup. In the background are pale yellow walls and a window looking into a quiet garden. Realistic photography with fine ceramic detail and warm, gentle colors.",
+        "warmup_2steps": {
+          "total_s": 4.437527875000342,
+          "encode_s": 0.2805340830000205,
+          "denoise_s": 2.9521768750000774,
+          "decode_s": 1.2048169170002438,
+          "peak_mlx_bytes": 29504996784
+        },
+        "samples": [
+          {
+            "total_s": 18.167116750000787,
+            "encode_s": 0.24165095800071867,
+            "denoise_s": 16.76892854199923,
+            "decode_s": 1.156537250000838,
+            "peak_mlx_bytes": 29504996824
+          },
+          {
+            "total_s": 18.216709540999545,
+            "encode_s": 0.24659383299967885,
+            "denoise_s": 16.782666625000275,
+            "decode_s": 1.187449082999592,
+            "peak_mlx_bytes": 29504996824
+          },
+          {
+            "total_s": 18.222689499999433,
+            "encode_s": 0.24064083299981576,
+            "denoise_s": 16.802088542000092,
+            "decode_s": 1.1799601249995249,
+            "peak_mlx_bytes": 29504996824
+          }
+        ],
+        "median": {
+          "total_s": 18.216709540999545,
+          "encode_s": 0.24165095800071867,
+          "denoise_s": 16.782666625000275,
+          "decode_s": 1.1799601249995249
+        },
+        "peak_mlx_bytes": 29504996824
+      },
+      {
+        "name": "text-1024",
+        "size": 1024,
+        "references": 0,
+        "prompt": "A red ceramic teapot on an old wooden table in a sunlit kitchen. A small green potted plant stands beside the teapot. Soft morning light enters from the left, casting natural shadows across the grain of the wood. A white linen cloth lies folded at the edge of the table, beside a blue cup. In the background are pale yellow walls and a window looking into a quiet garden. Realistic photography with fine ceramic detail and warm, gentle colors.",
+        "warmup_2steps": {
+          "total_s": 16.367246667000472,
+          "encode_s": 0.2456545000004553,
+          "denoise_s": 12.330676374999712,
+          "decode_s": 3.7909157920003054,
+          "peak_mlx_bytes": 39521002788
+        },
+        "samples": [
+          {
+            "total_s": 76.15249412499998,
+            "encode_s": 0.24851845800003503,
+            "denoise_s": 72.37239420900005,
+            "decode_s": 3.5315814579998914,
+            "peak_mlx_bytes": 39521002828
+          },
+          {
+            "total_s": 76.22078587499982,
+            "encode_s": 0.2504703750000772,
+            "denoise_s": 72.82236299999931,
+            "decode_s": 3.1479525000004287,
+            "peak_mlx_bytes": 39521002828
+          },
+          {
+            "total_s": 77.65517612500025,
+            "encode_s": 0.2507514999997511,
+            "denoise_s": 72.37657966700044,
+            "decode_s": 5.02784495800006,
+            "peak_mlx_bytes": 39521002828
+          }
+        ],
+        "median": {
+          "total_s": 76.22078587499982,
+          "encode_s": 0.2504703750000772,
+          "denoise_s": 72.37657966700044,
+          "decode_s": 3.5315814579998914
+        },
+        "peak_mlx_bytes": 39521002828
+      },
+      {
+        "name": "edit2-512",
+        "size": 512,
+        "references": 2,
+        "prompt": "Place the red circle from image 1 to the left of the blue square from image 2, on one clean white background, with both shapes fully visible.",
+        "warmup_2steps": {
+          "total_s": 5.889470374999291,
+          "encode_s": 1.0057270839997727,
+          "denoise_s": 3.7603625000001557,
+          "decode_s": 1.123380790999363,
+          "peak_mlx_bytes": 30608858202
+        },
+        "samples": [
+          {
+            "total_s": 19.753862624999783,
+            "encode_s": 1.0053571669996018,
+            "denoise_s": 17.649331083000106,
+            "decode_s": 1.099174375000075,
+            "peak_mlx_bytes": 30608858242
+          },
+          {
+            "total_s": 19.71607045899964,
+            "encode_s": 1.030145249999805,
+            "denoise_s": 17.545587708999847,
+            "decode_s": 1.140337499999987,
+            "peak_mlx_bytes": 30608858242
+          },
+          {
+            "total_s": 19.709272125000098,
+            "encode_s": 1.0098022920001313,
+            "denoise_s": 17.589463457999955,
+            "decode_s": 1.1100063750000118,
+            "peak_mlx_bytes": 30608858242
+          }
+        ],
+        "median": {
+          "total_s": 19.71607045899964,
+          "encode_s": 1.0098022920001313,
+          "denoise_s": 17.589463457999955,
+          "decode_s": 1.1100063750000118
+        },
+        "peak_mlx_bytes": 30608858242
+      }
+    ],
+    "vision_load_s": 0.23306533399954787
+  },
+  {
+    "precision": "q4",
+    "device": "Apple M1 Ultra",
+    "python": "3.12.14",
+    "macos": "26.6.2",
+    "mflux": "0.20.0",
+    "mlx": "0.32.2",
+    "checkpoint": "b3179ad355be050328e483a9dfdd9e60cd62adfa",
+    "steps": 12,
+    "seed": 42,
+    "guidance": 1.0,
+    "context_cache": true,
+    "allocator_mib": 0,
+    "repeats": 3,
+    "load_s": 4.137777166999513,
+    "cases": [
+      {
+        "name": "text-512",
+        "size": 512,
+        "references": 0,
+        "prompt": "A red ceramic teapot on an old wooden table in a sunlit kitchen. A small green potted plant stands beside the teapot. Soft morning light enters from the left, casting natural shadows across the grain of the wood. A white linen cloth lies folded at the edge of the table, beside a blue cup. In the background are pale yellow walls and a window looking into a quiet garden. Realistic photography with fine ceramic detail and warm, gentle colors.",
+        "warmup_2steps": {
+          "total_s": 4.619748291000178,
+          "encode_s": 0.26840645800075436,
+          "denoise_s": 3.0546736249998503,
+          "decode_s": 1.2966682079995735,
+          "peak_mlx_bytes": 25947440560
+        },
+        "samples": [
+          {
+            "total_s": 18.18624600000021,
+            "encode_s": 0.24987795800007007,
+            "denoise_s": 16.8550781670001,
+            "decode_s": 1.0812898750000386,
+            "peak_mlx_bytes": 25947440600
+          },
+          {
+            "total_s": 18.453852541999368,
+            "encode_s": 0.24883141699956468,
+            "denoise_s": 16.862738542000443,
+            "decode_s": 1.3422825829993599,
+            "peak_mlx_bytes": 25947440600
+          },
+          {
+            "total_s": 18.4316765829999,
+            "encode_s": 0.2488595830000122,
+            "denoise_s": 16.867753458999687,
+            "decode_s": 1.3150635410001996,
+            "peak_mlx_bytes": 25947440600
+          }
+        ],
+        "median": {
+          "total_s": 18.4316765829999,
+          "encode_s": 0.2488595830000122,
+          "denoise_s": 16.862738542000443,
+          "decode_s": 1.3150635410001996
+        },
+        "peak_mlx_bytes": 25947440600
+      },
+      {
+        "name": "text-1024",
+        "size": 1024,
+        "references": 0,
+        "prompt": "A red ceramic teapot on an old wooden table in a sunlit kitchen. A small green potted plant stands beside the teapot. Soft morning light enters from the left, casting natural shadows across the grain of the wood. A white linen cloth lies folded at the edge of the table, beside a blue cup. In the background are pale yellow walls and a window looking into a quiet garden. Realistic photography with fine ceramic detail and warm, gentle colors.",
+        "warmup_2steps": {
+          "total_s": 15.7809819160002,
+          "encode_s": 0.24572929099940666,
+          "denoise_s": 12.39396458400006,
+          "decode_s": 3.1412880410007347,
+          "peak_mlx_bytes": 35963446564
+        },
+        "samples": [
+          {
+            "total_s": 77.37040350000007,
+            "encode_s": 0.25248608400033845,
+            "denoise_s": 73.4582620000001,
+            "decode_s": 3.659655415999623,
+            "peak_mlx_bytes": 35963446604
+          },
+          {
+            "total_s": 77.40504137500011,
+            "encode_s": 0.26316774999941117,
+            "denoise_s": 73.34752420800032,
+            "decode_s": 3.794349417000376,
+            "peak_mlx_bytes": 35963446604
+          },
+          {
+            "total_s": 77.626374167,
+            "encode_s": 0.2510590420006338,
+            "denoise_s": 73.40432037499977,
+            "decode_s": 3.9709947499995906,
+            "peak_mlx_bytes": 35963446604
+          }
+        ],
+        "median": {
+          "total_s": 77.40504137500011,
+          "encode_s": 0.25248608400033845,
+          "denoise_s": 73.40432037499977,
+          "decode_s": 3.794349417000376
+        },
+        "peak_mlx_bytes": 35963446604
+      },
+      {
+        "name": "edit2-512",
+        "size": 512,
+        "references": 2,
+        "prompt": "Place the red circle from image 1 to the left of the blue square from image 2, on one clean white background, with both shapes fully visible.",
+        "warmup_2steps": {
+          "total_s": 6.148169541000243,
+          "encode_s": 0.9810922500000743,
+          "denoise_s": 3.9498721660002047,
+          "decode_s": 1.217205124999964,
+          "peak_mlx_bytes": 27051301978
+        },
+        "samples": [
+          {
+            "total_s": 19.89509970800009,
+            "encode_s": 0.8408289999997578,
+            "denoise_s": 18.138858374999472,
+            "decode_s": 0.9154123330008588,
+            "peak_mlx_bytes": 27051302018
+          },
+          {
+            "total_s": 20.284252209000442,
+            "encode_s": 0.9987422500007597,
+            "denoise_s": 18.230097958999977,
+            "decode_s": 1.0554119999997056,
+            "peak_mlx_bytes": 27051302018
+          },
+          {
+            "total_s": 20.24416950000068,
+            "encode_s": 0.9972939160006717,
+            "denoise_s": 18.17446016699978,
+            "decode_s": 1.0724154170002294,
+            "peak_mlx_bytes": 27051302018
+          }
+        ],
+        "median": {
+          "total_s": 20.24416950000068,
+          "encode_s": 0.9972939160006717,
+          "denoise_s": 18.17446016699978,
+          "decode_s": 1.0554119999997056
+        },
+        "peak_mlx_bytes": 27051302018
+      }
+    ],
+    "vision_load_s": 0.2356542500001524
+  }
+]

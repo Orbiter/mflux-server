@@ -1,0 +1,39 @@
+{
+  "info": {
+    "context_kv_cache": false,
+    "default_guidance": 1.0,
+    "default_steps": 4,
+    "edit": true,
+    "inference_optimizations": [
+      "prompt_cache",
+      "reference_encode_cache",
+      "predictor_cache"
+    ],
+    "max_init_images": 4,
+    "model": "flux2-klein-4b",
+    "multi_image_edit": true,
+    "quantize": null
+  },
+  "generations": [
+    {
+      "references": 0,
+      "sha256": "4b849e2c036de496ed85fbfe6e585659e45a5221284cfdb054fd541522a7359e",
+      "queue_delay_s": 0.0004930496215820312
+    },
+    {
+      "references": 0,
+      "sha256": "4b849e2c036de496ed85fbfe6e585659e45a5221284cfdb054fd541522a7359e",
+      "queue_delay_s": 0.00019812583923339844
+    },
+    {
+      "references": 4,
+      "sha256": "960b51ba39887f82ed557d8f03cd295bbc04ea26a2cba3adf62556f04bf1facc",
+      "queue_delay_s": 0.00020623207092285156
+    },
+    {
+      "references": 4,
+      "sha256": "960b51ba39887f82ed557d8f03cd295bbc04ea26a2cba3adf62556f04bf1facc",
+      "queue_delay_s": 0.0002079010009765625
+    }
+  ]
+}

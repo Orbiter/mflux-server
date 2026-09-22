@@ -1,0 +1,122 @@
+{
+  "environment": {
+    "device": "Apple M1 Ultra",
+    "real_weights": true,
+    "parameters": {
+      "model_path": "Qwen/Qwen-Image-2.1 snapshot b3179ad355be050328e483a9dfdd9e60cd62adfa",
+      "quantize": 8,
+      "text_lengths": [
+        64,
+        256,
+        768
+      ],
+      "size": 512,
+      "steps": 6,
+      "repeats": 2,
+      "allocator_mib": 0
+    },
+    "python": "3.12",
+    "mflux": "0.20.0",
+    "mlx": "0.32.2",
+    "measurement_date": "2026-09-22"
+  },
+  "synthetic_input_benchmark": [
+    {
+      "text_tokens": 64,
+      "image_tokens": 1024,
+      "native_s": 8.67205752100017,
+      "cached_s": 8.363881646000209,
+      "speedup": 1.0368460348966484,
+      "cold_s": {
+        "native": 8.594763000000057,
+        "cached": 8.339037040999756
+      },
+      "samples_s": {
+        "native": [
+          8.77323000000024,
+          8.5708850420001
+        ],
+        "cached": [
+          8.366175125000154,
+          8.361588167000264
+        ]
+      },
+      "peak_bytes": {
+        "native": 8444584580,
+        "cached": 8923062920
+      },
+      "relative_rmse": 0.012798335403203964,
+      "max_abs_error": 0.2421875
+    },
+    {
+      "text_tokens": 256,
+      "image_tokens": 1024,
+      "native_s": 10.115939937500116,
+      "cached_s": 8.488958166999737,
+      "speedup": 1.1916585920784912,
+      "cold_s": {
+        "native": 10.11858387500024,
+        "cached": 8.507720750000317
+      },
+      "samples_s": {
+        "native": [
+          10.113597333000143,
+          10.118282542000088
+        ],
+        "cached": [
+          8.489849083999616,
+          8.488067249999858
+        ]
+      },
+      "peak_bytes": {
+        "native": 8548983512,
+        "cached": 9168134876
+      },
+      "relative_rmse": 0.11289642751216888,
+      "max_abs_error": 0.757080078125
+    },
+    {
+      "text_tokens": 768,
+      "image_tokens": 1024,
+      "native_s": 14.282228604500006,
+      "cached_s": 9.5418561460001,
+      "speedup": 1.4967977284468963,
+      "cold_s": {
+        "native": 14.154035750000276,
+        "cached": 9.352525249999871
+      },
+      "samples_s": {
+        "native": [
+          14.151315250000152,
+          14.413141958999859
+        ],
+        "cached": [
+          9.530198833000213,
+          9.553513458999987
+        ]
+      },
+      "peak_bytes": {
+        "native": 8577229564,
+        "cached": 9385321216
+      },
+      "relative_rmse": 0.07129728049039841,
+      "max_abs_error": 0.516357421875
+    }
+  ],
+  "real_prompt_verification": {
+    "device": "Apple M1 Ultra",
+    "prompt": "A red ceramic teapot on an old wooden table in a sunlit kitchen. A small green potted plant stands beside the teapot. Soft morning light enters from the left, casting natural shadows across the grain of the wood. A white linen cloth lies folded at the edge of the table, beside a blue cup. In the background are pale yellow walls and a window looking into a quiet garden. Realistic photography with fine ceramic detail and warm, gentle colors.",
+    "text_tokens": 101,
+    "steps": 20,
+    "size": 256,
+    "seed": 42,
+    "quantize": 8,
+    "allocator_mib": 512,
+    "denoise_s": {
+      "native": 10.301715791999868,
+      "cached": 7.270791415999611
+    },
+    "relative_latent_rmse": 0.018757153302431107,
+    "pixel_psnr_db": 37.82364508573018
+  }
+}

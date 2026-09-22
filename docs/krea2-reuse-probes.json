@@ -1,0 +1,65 @@
+{
+  "device": "Apple M1 Ultra",
+  "results": [
+    {
+      "test": "prepared_text_fusion",
+      "random_small_model": true,
+      "max_abs_errors": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "test": "sdpa_gqa",
+      "synthetic_inputs": true,
+      "tokens": 1152,
+      "expanded_median_ms": 4.820708003535401,
+      "grouped_median_ms": 4.096833497897023,
+      "expanded_samples_ms": [
+        7.403374998830259,
+        4.826333002711181,
+        4.812042003322858,
+        4.8150830043596216,
+        4.778542002895847,
+        4.913124997983687
+      ],
+      "grouped_samples_ms": [
+        7.106958000804298,
+        7.117334003851283,
+        4.117291995498817,
+        4.034582998428959,
+        4.058584003360011,
+        4.076375000295229
+      ],
+      "max_abs_error": 0.0,
+      "unexpanded_kv_bytes": 7077888,
+      "expanded_kv_bytes": 28311552
+    },
+    {
+      "test": "sdpa_gqa",
+      "synthetic_inputs": true,
+      "tokens": 4224,
+      "expanded_median_ms": 43.10510350114782,
+      "grouped_median_ms": 40.76908349816222,
+      "expanded_samples_ms": [
+        42.86066599888727,
+        42.84508300042944,
+        43.4717499956605,
+        43.05029100214597,
+        43.15991600014968,
+        44.21858399291523
+      ],
+      "grouped_samples_ms": [
+        40.84424999746261,
+        41.0600830000476,
+        41.565667001123074,
+        40.69391699886182,
+        40.121625002939254,
+        39.50279200216755
+      ],
+      "max_abs_error": 0.0,
+      "unexpanded_kv_bytes": 25952256,
+      "expanded_kv_bytes": 103809024
+    }
+  ]
+}

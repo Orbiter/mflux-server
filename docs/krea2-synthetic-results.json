@@ -1,0 +1,568 @@
+{
+  "synthetic": true,
+  "device": "Apple M1 Ultra",
+  "python": "3.12.14",
+  "macos": "26.6.2",
+  "mflux": "0.20.0",
+  "mlx": "0.32.2",
+  "checkpoint": null,
+  "quantize": null,
+  "steps": 8,
+  "repeats": 7,
+  "allocator_mib": 0,
+  "prompt_cache": "cold",
+  "guidance": 1.0,
+  "prompt": "A small ceramic teapot on a wooden table beside a window, morning light.",
+  "negative_prompt": "blur, distorted shapes",
+  "init_image": null,
+  "compiled": true,
+  "synthetic_transformer": {
+    "features": 512,
+    "layers": 4,
+    "heads": 8,
+    "kvheads": 2,
+    "txtdim": 256,
+    "txtlayers": 12,
+    "text_tokens": 128
+  },
+  "load_s": 0.04480966700066347,
+  "cases": [
+    {
+      "size": 256,
+      "samples": {
+        "native": [
+          {
+            "total_s": 0.07323329099745024,
+            "prepare_s": 5.262500053504482e-05,
+            "denoise_s": 0.07217312500142725,
+            "peak_mlx_bytes": 235628760,
+            "seed": 42,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.07316570900002262,
+            "prepare_s": 4.420799814397469e-05,
+            "denoise_s": 0.07214733300497755,
+            "peak_mlx_bytes": 235891928,
+            "seed": 43,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.07339199999842094,
+            "prepare_s": 3.412499791011214e-05,
+            "denoise_s": 0.07236104200273985,
+            "peak_mlx_bytes": 235693648,
+            "seed": 44,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.07321091699850513,
+            "prepare_s": 3.512500552460551e-05,
+            "denoise_s": 0.0722201249882346,
+            "peak_mlx_bytes": 235891928,
+            "seed": 45,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.07330079100211151,
+            "prepare_s": 3.108300006715581e-05,
+            "denoise_s": 0.07229629199719056,
+            "peak_mlx_bytes": 235760888,
+            "seed": 46,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.07412770800146973,
+            "prepare_s": 3.495800046948716e-05,
+            "denoise_s": 0.07309016700310167,
+            "peak_mlx_bytes": 235826424,
+            "seed": 47,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.07386324999970384,
+            "prepare_s": 3.779200051212683e-05,
+            "denoise_s": 0.07279754200135358,
+            "peak_mlx_bytes": 235695352,
+            "seed": 48,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          }
+        ],
+        "optimized": [
+          {
+            "total_s": 0.05577900000207592,
+            "prepare_s": 0.004501207993598655,
+            "denoise_s": 0.050099709013011307,
+            "peak_mlx_bytes": 174495622,
+            "seed": 42,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0007378458976745605,
+            "latent_relative_rmse": 3.534569259500131e-05
+          },
+          {
+            "total_s": 0.05627375000040047,
+            "prepare_s": 0.0048146660046768375,
+            "denoise_s": 0.05046049999509705,
+            "peak_mlx_bytes": 174626694,
+            "seed": 43,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0008295774459838867,
+            "latent_relative_rmse": 3.8840964407427236e-05
+          },
+          {
+            "total_s": 0.05586891699931584,
+            "prepare_s": 0.004567541000142228,
+            "denoise_s": 0.050153459000284784,
+            "peak_mlx_bytes": 174626694,
+            "seed": 44,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0007058382034301758,
+            "latent_relative_rmse": 1.378652268613223e-05
+          },
+          {
+            "total_s": 0.05674758399982238,
+            "prepare_s": 0.004959166995831765,
+            "denoise_s": 0.050354208004137035,
+            "peak_mlx_bytes": 174626694,
+            "seed": 45,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0007012486457824707,
+            "latent_relative_rmse": 3.809990448644385e-05
+          },
+          {
+            "total_s": 0.05602925000130199,
+            "prepare_s": 0.004766334001033101,
+            "denoise_s": 0.04984454100485891,
+            "peak_mlx_bytes": 174626726,
+            "seed": 46,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 1.430511474609375e-06,
+            "latent_relative_rmse": 1.4085729560520122e-07
+          },
+          {
+            "total_s": 0.05619970800034935,
+            "prepare_s": 0.004499082999245729,
+            "denoise_s": 0.05072491700411774,
+            "peak_mlx_bytes": 174626726,
+            "seed": 47,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 1.430511474609375e-06,
+            "latent_relative_rmse": 1.3626210204620293e-07
+          },
+          {
+            "total_s": 0.05204866699932609,
+            "prepare_s": 0.004167624996625818,
+            "denoise_s": 0.046725084001081996,
+            "peak_mlx_bytes": 174163826,
+            "seed": 48,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 1.430511474609375e-06,
+            "latent_relative_rmse": 1.3966155165689997e-07
+          }
+        ]
+      },
+      "warmup": {
+        "native": {
+          "total_s": 0.03513570899667684,
+          "prepare_s": 4.7209003241732717e-05,
+          "denoise_s": 0.03369858199584996,
+          "peak_mlx_bytes": 171088676,
+          "seed": 41,
+          "prompt_cache_bytes": 0
+        },
+        "optimized": {
+          "total_s": 0.022352624997438397,
+          "prepare_s": 0.005612708002445288,
+          "denoise_s": 0.015482874994631857,
+          "peak_mlx_bytes": 174032546,
+          "seed": 41,
+          "prompt_cache_bytes": 0
+        }
+      },
+      "median": {
+        "native": {
+          "total_s": 0.07330079100211151,
+          "prepare_s": 3.512500552460551e-05,
+          "denoise_s": 0.07229629199719056
+        },
+        "optimized": {
+          "total_s": 0.05602925000130199,
+          "prepare_s": 0.004567541000142228,
+          "denoise_s": 0.050153459000284784
+        }
+      }
+    },
+    {
+      "size": 512,
+      "samples": {
+        "native": [
+          {
+            "total_s": 0.1163128330008476,
+            "prepare_s": 3.833299706457183e-05,
+            "denoise_s": 0.11522637600864982,
+            "peak_mlx_bytes": 323944882,
+            "seed": 42,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.11609775000397349,
+            "prepare_s": 3.941699833376333e-05,
+            "denoise_s": 0.11501358299574349,
+            "peak_mlx_bytes": 324796850,
+            "seed": 43,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.11681379200308584,
+            "prepare_s": 3.6833000194747e-05,
+            "denoise_s": 0.1160335840031621,
+            "peak_mlx_bytes": 324272562,
+            "seed": 44,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.11629129199718591,
+            "prepare_s": 3.5291996027808636e-05,
+            "denoise_s": 0.11526841700833756,
+            "peak_mlx_bytes": 324796850,
+            "seed": 45,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.1153742919996148,
+            "prepare_s": 3.629099956015125e-05,
+            "denoise_s": 0.11430445899895858,
+            "peak_mlx_bytes": 324272562,
+            "seed": 46,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.11673291599436197,
+            "prepare_s": 3.4374999813735485e-05,
+            "denoise_s": 0.1156945420007105,
+            "peak_mlx_bytes": 324796850,
+            "seed": 47,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.10025124999810942,
+            "prepare_s": 3.8958001823630184e-05,
+            "denoise_s": 0.09903699999995297,
+            "peak_mlx_bytes": 323485014,
+            "seed": 48,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          }
+        ],
+        "optimized": [
+          {
+            "total_s": 0.09774533299787436,
+            "prepare_s": 0.004498500005865935,
+            "denoise_s": 0.09222779198898934,
+            "peak_mlx_bytes": 249665504,
+            "seed": 42,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0008929967880249023,
+            "latent_relative_rmse": 3.721676330314949e-05
+          },
+          {
+            "total_s": 0.09778108300088206,
+            "prepare_s": 0.004423209000378847,
+            "denoise_s": 0.09224487499886891,
+            "peak_mlx_bytes": 249993184,
+            "seed": 43,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0012058019638061523,
+            "latent_relative_rmse": 2.393216527707409e-05
+          },
+          {
+            "total_s": 0.09744212499936111,
+            "prepare_s": 0.00462925000465475,
+            "denoise_s": 0.0918677499939804,
+            "peak_mlx_bytes": 249993184,
+            "seed": 44,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0007834434509277344,
+            "latent_relative_rmse": 3.457316415733658e-05
+          },
+          {
+            "total_s": 0.0994085839993204,
+            "prepare_s": 0.004853833997913171,
+            "denoise_s": 0.0922190409983159,
+            "peak_mlx_bytes": 249993184,
+            "seed": 45,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0008085370063781738,
+            "latent_relative_rmse": 3.402149741305038e-05
+          },
+          {
+            "total_s": 0.09854774999985239,
+            "prepare_s": 0.004582708002999425,
+            "denoise_s": 0.09227745899988804,
+            "peak_mlx_bytes": 249993184,
+            "seed": 46,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0007071495056152344,
+            "latent_relative_rmse": 2.9071985409245826e-05
+          },
+          {
+            "total_s": 0.0976427080022404,
+            "prepare_s": 0.0048128340058610775,
+            "denoise_s": 0.09181533199443948,
+            "peak_mlx_bytes": 249993184,
+            "seed": 47,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0007948875427246094,
+            "latent_relative_rmse": 3.799777914537117e-05
+          },
+          {
+            "total_s": 0.09635112500109244,
+            "prepare_s": 0.00428483299765503,
+            "denoise_s": 0.08990625000296859,
+            "peak_mlx_bytes": 249993184,
+            "seed": 48,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0012378692626953125,
+            "latent_relative_rmse": 3.896767884725705e-05
+          }
+        ]
+      },
+      "warmup": {
+        "native": {
+          "total_s": 0.03168320799886715,
+          "prepare_s": 3.3915996027644724e-05,
+          "denoise_s": 0.030672667002363596,
+          "peak_mlx_bytes": 322367636,
+          "seed": 41,
+          "prompt_cache_bytes": 0
+        },
+        "optimized": {
+          "total_s": 0.03296974999830127,
+          "prepare_s": 0.004474166002182756,
+          "denoise_s": 0.02609312599815894,
+          "peak_mlx_bytes": 247826172,
+          "seed": 41,
+          "prompt_cache_bytes": 0
+        }
+      },
+      "median": {
+        "native": {
+          "total_s": 0.11629129199718591,
+          "prepare_s": 3.6833000194747e-05,
+          "denoise_s": 0.11522637600864982
+        },
+        "optimized": {
+          "total_s": 0.09774533299787436,
+          "prepare_s": 0.004582708002999425,
+          "denoise_s": 0.0922190409983159
+        }
+      }
+    },
+    {
+      "size": 1024,
+      "samples": {
+        "native": [
+          {
+            "total_s": 0.29807216599874664,
+            "prepare_s": 3.7500001781154424e-05,
+            "denoise_s": 0.29673033399740234,
+            "peak_mlx_bytes": 790990082,
+            "seed": 42,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.2578761670010863,
+            "prepare_s": 3.5707998904399574e-05,
+            "denoise_s": 0.2566096250011469,
+            "peak_mlx_bytes": 794397954,
+            "seed": 43,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.2772442079949542,
+            "prepare_s": 3.5541001125238836e-05,
+            "denoise_s": 0.27614566699776333,
+            "peak_mlx_bytes": 792300802,
+            "seed": 44,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.2601109160023043,
+            "prepare_s": 2.9499999072868377e-05,
+            "denoise_s": 0.2592702910042135,
+            "peak_mlx_bytes": 794397954,
+            "seed": 45,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.29171745799976634,
+            "prepare_s": 3.2625001040287316e-05,
+            "denoise_s": 0.290608749994135,
+            "peak_mlx_bytes": 792300802,
+            "seed": 46,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.26048112499847775,
+            "prepare_s": 3.8833997678011656e-05,
+            "denoise_s": 0.25915608200011775,
+            "peak_mlx_bytes": 794397954,
+            "seed": 47,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          },
+          {
+            "total_s": 0.2775253329964471,
+            "prepare_s": 3.4167002013418823e-05,
+            "denoise_s": 0.27637012399645755,
+            "peak_mlx_bytes": 792300802,
+            "seed": 48,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0,
+            "latent_relative_rmse": 0.0
+          }
+        ],
+        "optimized": [
+          {
+            "total_s": 0.2302457920013694,
+            "prepare_s": 0.003944834003050346,
+            "denoise_s": 0.22504441600176506,
+            "peak_mlx_bytes": 663918640,
+            "seed": 42,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0013469457626342773,
+            "latent_relative_rmse": 3.10902796627488e-05
+          },
+          {
+            "total_s": 0.23293337500217604,
+            "prepare_s": 0.0034937919990625232,
+            "denoise_s": 0.22832504100369988,
+            "peak_mlx_bytes": 665229360,
+            "seed": 43,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0013405084609985352,
+            "latent_relative_rmse": 3.0036015232326463e-05
+          },
+          {
+            "total_s": 0.23694366699783131,
+            "prepare_s": 0.003661792005004827,
+            "denoise_s": 0.23256329099967843,
+            "peak_mlx_bytes": 755955812,
+            "seed": 44,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0012395381927490234,
+            "latent_relative_rmse": 3.177197868353687e-05
+          },
+          {
+            "total_s": 0.2338204580009915,
+            "prepare_s": 0.0037708329982706346,
+            "denoise_s": 0.2283897090019309,
+            "peak_mlx_bytes": 665229360,
+            "seed": 45,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0008617043495178223,
+            "latent_relative_rmse": 2.8701662813546136e-05
+          },
+          {
+            "total_s": 0.2556341249946854,
+            "prepare_s": 0.0038287089992081746,
+            "denoise_s": 0.2473388319995138,
+            "peak_mlx_bytes": 665229360,
+            "seed": 46,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0008763819932937622,
+            "latent_relative_rmse": 2.848853364412207e-05
+          },
+          {
+            "total_s": 0.24804487499932293,
+            "prepare_s": 0.003416125000512693,
+            "denoise_s": 0.24351224999554688,
+            "peak_mlx_bytes": 665229360,
+            "seed": 47,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0014644861221313477,
+            "latent_relative_rmse": 3.0485103707178496e-05
+          },
+          {
+            "total_s": 0.22729641699697822,
+            "prepare_s": 0.003695500003232155,
+            "denoise_s": 0.22167779199662618,
+            "peak_mlx_bytes": 665229382,
+            "seed": 48,
+            "prompt_cache_bytes": 0,
+            "latent_max_abs_error": 0.0013697147369384766,
+            "latent_relative_rmse": 3.196489706169814e-05
+          }
+        ]
+      },
+      "warmup": {
+        "native": {
+          "total_s": 0.0795700839953497,
+          "prepare_s": 3.362499410286546e-05,
+          "denoise_s": 0.07876008400489809,
+          "peak_mlx_bytes": 750087118,
+          "seed": 41,
+          "prompt_cache_bytes": 0
+        },
+        "optimized": {
+          "total_s": 0.0700110420002602,
+          "prepare_s": 0.003756374993827194,
+          "denoise_s": 0.06498400001146365,
+          "peak_mlx_bytes": 656574284,
+          "seed": 41,
+          "prompt_cache_bytes": 0
+        }
+      },
+      "median": {
+        "native": {
+          "total_s": 0.2772442079949542,
+          "prepare_s": 3.5541001125238836e-05,
+          "denoise_s": 0.27614566699776333
+        },
+        "optimized": {
+          "total_s": 0.2338204580009915,
+          "prepare_s": 0.003695500003232155,
+          "denoise_s": 0.2283897090019309
+        }
+      }
+    }
+  ]
+}
