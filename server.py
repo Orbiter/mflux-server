@@ -12,6 +12,8 @@ import base64
 import hashlib
 import argparse
 import threading
+import binascii
+from tempfile import TemporaryDirectory
 import mlx.core as mx
 from mlx.core import metal as metal_compat
 from PIL import Image
@@ -24,9 +26,10 @@ from huggingface_hub import snapshot_download
 from mflux.models.common.config import ModelConfig
 from mflux.models.flux.variants.txt2img.flux import Flux1
 from mflux.models.qwen.variants.txt2img.qwen_image import QwenImage
+from mflux.models.qwen21.variants.txt2img.qwen_image_21 import QwenImage21
 from mflux.models.qwen.model.qwen_vae.qwen_vae import QwenVAE
 from mflux.models.fibo.variants.txt2img.fibo import FIBO
-from mflux.models.flux2.variants.txt2img.flux2_klein import Flux2Klein
+from mflux.models.flux2.variants.edit.flux2_klein_edit import Flux2KleinEdit
 from mflux.models.ernie_image import ErnieImage
 from mflux.models.krea2 import Krea2
 from mflux.models.krea2.weights.krea2_weight_definition import Krea2WeightDefinition
@@ -35,6 +38,10 @@ from mflux.models.ideogram4.latent_creator import Ideogram4LatentCreator
 from mflux.models.ideogram4.model.ideogram4_scheduler import Ideogram4Scheduler
 from mflux.models.ideogram4.model.ideogram4_text_encoder import Ideogram4PromptEncoder
 from mflux.models.z_image.variants.z_image import ZImage
+from qwen21_context import cached_qwen21_context
+from qwen21_edit import MAX_REFERENCE_IMAGES, generate_qwen21_references
+from krea2_inference import optimized_krea2
+from flux2_inference import FLUX2_4B_NAMES, optimized_flux2
 
 # These class constants contain lazy reshape operations created during import.
 # Materialize them on their owning thread before Qwen/Krea decode on the worker.
@@ -89,13 +96,18 @@ apppath = os.path.dirname(__file__)
 tasklist = []         # list which holds the image computation tasks
 model_instance = None # the model object, initialized in main()
 pixels = 1024 * 1024  # the number of pixels in all of the computed images (start value)
-ctime = 80            # the total computation time for all images in seconds (start value)
+ctime = 120           # initial estimate: 120 seconds per 1024×1024 image
 metal_cache_limit = 0 # the cache limit for the metal library
-model = "ernie-image-turbo" # default model
+qwen21_context_cache = True
+krea2_optimizations = True
+flux2_optimizations = True
+DEFAULT_MODEL = "flux2-klein-4b"
+model = DEFAULT_MODEL
 model_quantize = None # quantization level in use
 model_lock = threading.Lock()
 model_load_requests = []
 model_worker_thread = None
+worker_wakeup = threading.Event()
 IDEOGRAM4_DEFAULT_PRESET = "V4_DEFAULT_20"
 IDEOGRAM4_PRESETS = {
     name: preset.num_steps for name, preset in Ideogram4Scheduler.PRESETS.items()
@@ -108,16 +120,20 @@ MODEL_REGISTRY = {
     "krea-dev": {"loader": "flux", "steps": 25},
     "filipstrand/FLUX.1-Krea-dev-mflux-4bit": {"loader": "flux", "steps": 25},
     "qwen": {"loader": "qwen", "steps": 25},
+    **{
+        name: {"loader": "qwen21", "steps": 40, "guidance": 1.0}
+        for name in ("qwen-image-2.1", "qwen-2.1", "qwen-image-21", "Qwen/Qwen-Image-2.1")
+    },
     "filipstrand/Qwen-Image-mflux-6bit": {"loader": "qwen", "steps": 25, "quantize": 6},
     "fibo": {"loader": "fibo", "steps": 25},
     "briaai/Fibo-mlx-4bit": {"loader": "fibo", "steps": 25},
     "briaai/Fibo-mlx-8bit": {"loader": "fibo", "steps": 25},
     "z-image-turbo": {"loader": "z-image", "steps": 9},
     "filipstrand/Z-Image-Turbo-mflux-4bit": {"loader": "z-image", "steps": 9},
-    "flux2-klein-9b": {"loader": "flux2", "steps": 4},
-    "black-forest-labs/FLUX.2-klein-9B": {"loader": "flux2", "steps": 4},
-    "flux2-klein-4b": {"loader": "flux2", "steps": 4},
-    "black-forest-labs/FLUX.2-klein-4B": {"loader": "flux2", "steps": 4},
+    "flux2-klein-9b": {"loader": "flux2", "steps": 4, "guidance": 1.0},
+    "black-forest-labs/FLUX.2-klein-9B": {"loader": "flux2", "steps": 4, "guidance": 1.0},
+    "flux2-klein-4b": {"loader": "flux2", "steps": 4, "guidance": 1.0},
+    "black-forest-labs/FLUX.2-klein-4B": {"loader": "flux2", "steps": 4, "guidance": 1.0},
     "ernie-image-turbo": {"loader": "ernie", "steps": 8, "guidance": 1.0},
     "baidu/ERNIE-Image-Turbo": {"loader": "ernie", "steps": 8, "guidance": 1.0},
     "ernie-image": {"loader": "ernie", "steps": 50, "guidance": 4.0},
@@ -154,6 +170,52 @@ def _normalize_flux2_model_name(model_name: str) -> str:
     mapped = FLUX2_NAME_MAP.get(normalized.lower())
     return mapped or normalized
 
+def image_capabilities(model_name: str):
+    """Input limits for the adapters implemented by this server."""
+    loader = MODEL_REGISTRY[model_name]["loader"]
+    limit = {"ideogram4": 0, "flux2": 4, "qwen21": MAX_REFERENCE_IMAGES}.get(loader, 1)
+    return {"edit": limit > 0, "multi_image_edit": limit > 1, "max_init_images": limit}
+
+
+def validate_image_count(model_name: str, count: int):
+    limit = image_capabilities(model_name)["max_init_images"]
+    if count > limit:
+        raise ValueError(f"{model_name} accepts at most {limit} input image(s); received {count}.")
+
+
+def decode_input_images(args, model_name: str):
+    """Validate the complete request before decoding images into queue-owned copies."""
+    encoded_images = args.get("init_images", [])
+    if not isinstance(encoded_images, list):
+        raise ValueError("init_images must be an array of encoded images.")
+    single = args.get("init_image")
+    if single is not None and not isinstance(single, str):
+        raise ValueError("init_image must be an encoded image string.")
+    if encoded_images and single:
+        raise ValueError("Specify either init_image or init_images.")
+    entries = [(f"init_images[{i}]", value) for i, value in enumerate(encoded_images)]
+    if single:
+        entries = [("init_image", single)]
+    validate_image_count(model_name, len(entries))
+    decoded = []
+    for field, value in entries:
+        try:
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError("expected a nonempty string")
+            value = value.strip()
+            if value.lower().startswith("data:"):
+                header, value = value.split(",", 1)
+                if not header.lower().startswith("data:image/") or not header.lower().endswith(";base64"):
+                    raise ValueError("expected an image data URL")
+            raw = base64.b64decode("".join(value.split()), validate=True)
+            with Image.open(io.BytesIO(raw)) as source:
+                source.load()
+                decoded.append(source.copy())
+        except (ValueError, binascii.Error, OSError, Image.DecompressionBombError) as exc:
+            raise ValueError(f"{field}: invalid base64 image or image data URL.") from exc
+    return decoded
+
+
 def load_model(model_name: str, quantize: int | None):
     info = MODEL_REGISTRY.get(model_name, {})
     loader = info.get("loader")
@@ -162,16 +224,16 @@ def load_model(model_name: str, quantize: int | None):
     if loader == "flux":
         return Flux1.from_name(quantize=effective_quantize, model_name=model_name)
     if loader == "flux2":
-        if Flux2Klein is None:
-            raise ValueError("Flux2 loader not available. Upgrade mflux to a version that includes flux2 support.")
         normalized_name = _normalize_flux2_model_name(model_name)
-        return Flux2Klein(
+        return Flux2KleinEdit(
             model_config=ModelConfig.from_name(model_name=normalized_name),
             quantize=effective_quantize,
             model_path=model_path,
         )
     if loader == "qwen":
         return QwenImage(quantize=effective_quantize, model_path=model_path)
+    if loader == "qwen21":
+        return QwenImage21(quantize=effective_quantize, model_path=model_path)
     if loader == "ideogram4":
         return Ideogram4(
             model_config=ModelConfig.ideogram4_fp8(),
@@ -212,6 +274,12 @@ def load_model(model_name: str, quantize: int | None):
 
 def generate_with_model(instance, model_name: str, task, init_image_path):
     info = MODEL_REGISTRY.get(model_name, {})
+    # Accept the former single-path call form as well as the worker's ordered list.
+    paths = list(init_image_path) if isinstance(init_image_path, (list, tuple)) else (
+        [init_image_path] if init_image_path is not None else []
+    )
+    validate_image_count(model_name, len(paths))
+    init_image_path = paths[0] if paths else None
     if info.get("loader") == "ideogram4":
         if init_image_path is not None:
             raise ValueError("Ideogram 4 does not support init_image (image-to-image generation).")
@@ -241,8 +309,27 @@ def generate_with_model(instance, model_name: str, task, init_image_path):
         "image_path": init_image_path,
         "image_strength": 0.4 if init_image_path else None
     }
-    if info.get("loader") in ["z-image", "flux2"]:
+    if info.get("loader") == "flux2":
+        common_kwargs.pop("image_path")
+        common_kwargs.pop("image_strength")
+        # Reference conditioning starts from fresh noise; no img2img strength applies.
+        with optimized_flux2(instance, enabled=flux2_optimizations):
+            return instance.generate_image(**common_kwargs, image_paths=paths or None, guidance=1.0)
+    if info.get("loader") == "z-image":
         return instance.generate_image(**common_kwargs)
+    if info.get("loader") == "qwen21":
+        common_kwargs["negative_prompt"] = task.get("negative_prompt")
+        if paths:
+            common_kwargs.pop("image_path")
+            common_kwargs.pop("image_strength")
+            return generate_qwen21_references(instance, paths, **common_kwargs, guidance=guidance,
+                                              use_cache=qwen21_context_cache)
+        with cached_qwen21_context(instance, enabled=qwen21_context_cache):
+            return instance.generate_image(**common_kwargs, guidance=guidance)
+    if info.get("loader") == "krea2":
+        common_kwargs["negative_prompt"] = task.get("negative_prompt")
+        with optimized_krea2(instance, enabled=krea2_optimizations):
+            return instance.generate_image(**common_kwargs, guidance=guidance)
     return instance.generate_image(**common_kwargs, guidance=guidance)
 
 def _load_model_runtime_now(model_name: str, quantize: int | None):
@@ -293,6 +380,7 @@ def load_model_runtime(model_name: str, quantize: int | None):
     }
     with model_lock:
         model_load_requests.append(request)
+    worker_wakeup.set()
     done.wait()
     if request["error"]:
         raise request["error"]
@@ -302,7 +390,7 @@ def _process_model_load_request(worker_stream):
     with model_lock:
         request = model_load_requests.pop(0) if model_load_requests else None
     if request is None:
-        return
+        return False
 
     try:
         with mx.stream(worker_stream):
@@ -311,6 +399,7 @@ def _process_model_load_request(worker_stream):
         request["error"] = exc
     finally:
         request["done"].set()
+    return True
 
 # we implement image generation as asynchronous task
 # this will be executed in a separate thread
@@ -335,85 +424,109 @@ def _new_mlx_worker_stream():
         return mx.new_stream(mx.gpu)
 
 
+def process_image_task(task, instance, model_name, quantize, worker_stream):
+    """Run one queued request and release every temporary reference on all exit paths."""
+    global pixels, ctime
+    task['compute_time'] = time.time()
+    task['model_used'] = model_name
+    task['quantize_used'] = quantize
+    try:
+        inputs = task.get('init_images', [])
+        if inputs and (
+            task.get('model_at_submit', model_name) != model_name
+            or task.get('quantize_at_submit', quantize) != quantize
+        ):
+            raise ValueError("The loaded model changed after this image-edit request was queued; submit it again.")
+        validate_image_count(model_name, len(inputs))
+        _set_mlx_cache_limit(metal_cache_limit)
+        with TemporaryDirectory(prefix="mflux-inputs-") as directory:
+            paths = []
+            for index, input_image in enumerate(inputs):
+                path = Path(directory) / f"reference-{index + 1}.png"
+                input_image.save(path, format="PNG")
+                paths.append(path)
+            with mx.stream(worker_stream):
+                result = generate_with_model(instance, model_name, task, paths)
+            output = result.image
+            output_format = task.get('format', 'JPEG').upper()
+            if output_format not in ('PNG', 'JPEG'):
+                output_format = 'JPEG'
+            if output_format == 'JPEG':
+                if 'A' in output.getbands() or 'transparency' in output.info:
+                    rgba = output.convert('RGBA')
+                    background = Image.new('RGBA', rgba.size, 'white')
+                    output = Image.alpha_composite(background, rgba).convert('RGB')
+                else:
+                    output = output.convert('RGB')
+            encoded = io.BytesIO()
+            options = {'quality': task['quality']} if output_format == 'JPEG' else {}
+            output.save(encoded, format=output_format, **options)
+            encoded.seek(0)
+        # Publish only once encoding and temporary-file cleanup have succeeded.
+        ctime += time.time() - task['compute_time']
+        pixels += output.width * output.height
+        task['format'] = output_format
+        task['image'] = encoded
+    except Exception as exc:
+        task['error'] = f"{type(exc).__name__}: {exc}"
+        app.logger.exception("Image generation failed for task %s", task['task_id'])
+    finally:
+        task['end_time'] = time.time()
+        task.pop('init_images', None)
+        for cleanup in (_clear_mlx_cache, gc.collect):
+            try:
+                cleanup()
+            except Exception:
+                app.logger.exception("Cleanup failed for task %s", task['task_id'])
+
+
 def compute_image_task():
     global model_instance, tasklist, pixels, ctime, model_worker_thread
     model_worker_thread = threading.current_thread()
     worker_stream = _new_mlx_worker_stream()
-    # we loop forever and in every iteration we check if there is a task to process
     while True:
-        _process_model_load_request(worker_stream)
+        # Clear before inspecting queues so arrivals during inspection remain
+        # signalled. Drain load requests before waiting, even when no model loaded.
+        worker_wakeup.clear()
+        if _process_model_load_request(worker_stream):
+            continue
         with model_lock:
             current_model_instance = model_instance
             current_model_name = model
             current_model_quantize = model_quantize
         if current_model_instance == None or len(tasklist) == 0:
-            time.sleep(1)
+            worker_wakeup.wait()
             continue
         
         # Process each pending task once, including tasks that fail.
         processed_task = False
         for task in tasklist:
             if 'image' in task or 'error' in task: continue
-            # found a task without image
-            compute_time = time.time()
-            task['compute_time'] = compute_time
-            task['model_used'] = current_model_name
-            task['quantize_used'] = current_model_quantize
-            init_image_path = None
-            generated_image = None
-            encoded_image = None
-            try:
-                _set_mlx_cache_limit(metal_cache_limit)
-                init_image = task['init_image']
-                if init_image:
-                    init_image_path = Path(f"/tmp/init_image_{task['task_id']}.png")
-                    init_image.save(str(init_image_path))
-
-                with mx.stream(worker_stream):
-                    generated_image = generate_with_model(current_model_instance, current_model_name, task, init_image_path)
-                generation_end_time = time.time()
-
-                # Encode before publishing the result so encoding failures are task errors too.
-                format = task.get('format', 'JPEG').upper()
-                if format not in ['PNG', 'JPEG']: format = 'JPEG'
-                encoded_image = io.BytesIO()
-                save_kwargs = {'quality': task['quality']} if format == 'JPEG' else {}
-                generated_image.image.save(encoded_image, format=format, **save_kwargs)
-                encoded_image.seek(0)
-                ctime += generation_end_time - compute_time
-                pixels += task['height'] * task['width']
-                task['image'] = encoded_image
-            except Exception as exc:
-                task['error'] = f"{type(exc).__name__}: {exc}"
-                app.logger.exception("Image generation failed for task %s", task['task_id'])
-            finally:
-                task['end_time'] = time.time()
-                del generated_image
-                del encoded_image
-                if init_image_path is not None:
-                    try:
-                        init_image_path.unlink(missing_ok=True)
-                    except Exception:
-                        app.logger.exception("Could not remove init image for task %s", task['task_id'])
-                for cleanup in (_clear_mlx_cache, gc.collect):
-                    try:
-                        cleanup()
-                    except Exception:
-                        app.logger.exception("Cleanup failed for task %s", task['task_id'])
+            process_image_task(task, current_model_instance, current_model_name,
+                               current_model_quantize, worker_stream)
             processed_task = True
             break
         
-        # if we did not found any task without image, we sleep for 1 second
-        if not processed_task: time.sleep(1)
+        if not processed_task:
+            worker_wakeup.wait()
 
 def str_to_bool(value):
     return value.lower() in ['true', '1', 't', 'y', 'yes']
+
+
+# Legacy clients send either a string or null. Validate this union in
+# decode_input_images; Flask-RESTX's Raw field otherwise requires an object.
+class EncodedImageField(fields.Raw):
+    __schema_type__ = None
 
 
 # generate image endpoint
 
 task_model = api.model('TaskInput', {
     'prompt': fields.String(description='The textual description, or a JSON caption encoded as a string for Ideogram 4.', default='A beautiful landscape', required=True),
+    'init_image': EncodedImageField(description='One base64 image or image data URL; null or empty means no image. Cannot be combined with a nonempty init_images array.'),
+    'init_images': fields.List(fields.String, description='Ordered base64 images or image data URLs for one output. Empty means no inputs. See /api/info for the model limit.'),
+    'negative_prompt': fields.String(description='Qwen Image 2.1 or Krea 2 negative conditioning; use guidance above 1.', required=False),
     'seed': fields.String(description='Entropy Seed', default=str(int(time.time())), required=False),
     'height': fields.Integer(description='Image height', default=1024, required=False),
     'width': fields.Integer(description='Image width', default=1024, required=False),
@@ -452,7 +565,40 @@ class ListModels(Resource):
         """
         The /ls endpoint provides a catalog of available models and defaults.
         """
-        return jsonify(MODEL_REGISTRY)
+        return jsonify({name: {**settings, **image_capabilities(name)} for name, settings in MODEL_REGISTRY.items()})
+
+info_model = api.model('ModelInfo', {
+    'model': fields.String(description='Currently selected model'),
+    'quantize': fields.Integer(description='Current quantization, or null'),
+    'edit': fields.Boolean(description='Accepts at least one input image (including ordinary img2img)'),
+    'multi_image_edit': fields.Boolean(description='Combines multiple ordered references into one output'),
+    'max_init_images': fields.Integer(description='Server input-image limit for this model'),
+    'default_steps': fields.Integer(description='Default inference steps'),
+    'default_guidance': fields.Float(description='Default guidance; ignored by models without guidance'),
+    'context_kv_cache': fields.Boolean(description='Qwen 2.1 request-local prefix reuse enabled; unsupported inputs use native execution'),
+    'inference_optimizations': fields.List(fields.String, description='Enabled model-specific inference optimizations'),
+})
+
+@api.route('/info')
+class GetInfo(Resource):
+    @api.response(200, 'Success', info_model)
+    def get(self):
+        with model_lock:
+            name, quantize = model, model_quantize
+        settings = MODEL_REGISTRY[name]
+        return jsonify({
+            'model': name, 'quantize': quantize,
+            **image_capabilities(name),
+            'default_steps': settings.get('steps', 4),
+            'default_guidance': settings.get('guidance', 3.5),
+            'context_kv_cache': qwen21_context_cache and settings.get('loader') == 'qwen21',
+            'inference_optimizations': (
+                ['prepared_text', 'cached_geometry', 'grouped_attention', 'image_only_output']
+                if krea2_optimizations and settings.get('loader') == 'krea2' else
+                ['prompt_cache', 'reference_encode_cache', 'predictor_cache']
+                if flux2_optimizations and name in FLUX2_4B_NAMES else []
+            ),
+        })
 
 @api.route('/ps')
 class GetSettings(Resource):
@@ -463,6 +609,7 @@ class GetSettings(Resource):
         """
         return jsonify({
             "model": model,
+            **image_capabilities(model),
             "quantize": model_quantize,
             "cache_limit": metal_cache_limit,
             "default_steps": MODEL_REGISTRY.get(model, {}).get("steps", 4),
@@ -494,6 +641,7 @@ class LoadModel(Resource):
             raise
         return {
             "model": model,
+            **image_capabilities(model),
             "quantize": model_quantize,
             "default_steps": MODEL_REGISTRY.get(model, {}).get("steps", 4),
             "default_preset": MODEL_REGISTRY.get(model, {}).get("preset")
@@ -520,20 +668,23 @@ class GenerateImage(Resource):
         seed = args.get('seed', str(int(time.time())))
         height = int(args.get('height', 1024))
         width = int(args.get('width', 1024))
-        steps = int(args.get('steps', MODEL_REGISTRY.get(model, {}).get("steps", 4)))
-        guidance = float(args.get('guidance', MODEL_REGISTRY.get(model, {}).get("guidance", 3.5)))
-        format = args.get('format', 'JPEG').upper()
-        quality = args.get('quality', 85)
-        priority = args.get('priority', False)
         with model_lock:
             model_at_submit = model
             quantize_at_submit = model_quantize
+        steps = int(args.get('steps', MODEL_REGISTRY[model_at_submit].get("steps", 4)))
+        guidance = float(args.get('guidance', MODEL_REGISTRY[model_at_submit].get("guidance", 3.5)))
+        format = args.get('format', 'JPEG').upper()
+        quality = args.get('quality', 85)
+        priority = args.get('priority', False)
 
         preset = args.get('preset', IDEOGRAM4_DEFAULT_PRESET)
         strict_caption_validation = args.get('strict_caption_validation', False)
+        if MODEL_REGISTRY[model_at_submit].get("loader") == "qwen21":
+            if width <= 0 or height <= 0 or width % 16 or height % 16:
+                return {"error": "Qwen Image 2.1 requires positive width and height divisible by 16."}, 400
+            if steps < 2:
+                return {"error": "Qwen Image 2.1 requires at least 2 steps."}, 400
         if MODEL_REGISTRY[model_at_submit].get("loader") == "ideogram4":
-            if args.get('init_image') is not None:
-                return {"error": "Ideogram 4 does not support init_image (image-to-image generation)."}, 400
             try:
                 Ideogram4LatentCreator.validate_dimensions(width=width, height=height)
                 steps = Ideogram4Scheduler.get_preset(preset).num_steps
@@ -547,17 +698,11 @@ class GenerateImage(Resource):
                 return {"error": str(exc)}, 400
             guidance = None  # Guidance is a per-step schedule selected by the preset.
 
-        # Decode init_image if it is provided
-        init_image = None
-        if 'init_image' in args:
-            try:
-                init_image_data = base64.b64decode(args['init_image'])
-                init_image = Image.open(io.BytesIO(init_image_data))
-                # log properties of the init_image, width, height, mode
-                print("init_image", init_image.size, init_image.mode)
-            except Exception as e:
-                pass # ignore errors
-            
+        try:
+            init_images = decode_input_images(args, model_at_submit)
+        except ValueError as exc:
+            return {"error": str(exc)}, 400
+
         start_time = time.time()
         # taskid is a 8-digit hex hash to identify the image
         md5 = hashlib.md5()
@@ -576,13 +721,16 @@ class GenerateImage(Resource):
             'quality': quality,
             'priority': priority,
             'start_time': start_time,
-            'init_image': init_image,
+            'init_images': init_images,
+            'init_image_count': len(init_images),
             'model_at_submit': model_at_submit,
             'quantize_at_submit': quantize_at_submit
         }
         if MODEL_REGISTRY[model_at_submit].get("loader") == "ideogram4":
             task_metadata['preset'] = preset
             task_metadata['strict_caption_validation'] = strict_caption_validation
+        if MODEL_REGISTRY[model_at_submit].get("loader") in ("qwen21", "krea2"):
+            task_metadata['negative_prompt'] = args.get('negative_prompt')
         
         # compute waiting time based on the number of pixels in the queue
         wait_for_pixels = width * height # include the current task
@@ -592,6 +740,7 @@ class GenerateImage(Resource):
         else:
             wait_for_pixels += count_pixels(len(tasklist))
             tasklist.append(task_metadata)
+        worker_wakeup.set()
 
         expected_time_seconds = ctime * wait_for_pixels / pixels
         return {
@@ -694,7 +843,9 @@ class CancelTask(Resource):
                 return Response(status=200)
         return Response(status=404)
 
-task_output_model = api.inherit('TaskOutput', task_model, {
+task_output_model = api.model('TaskOutput', {
+    **{key: field for key, field in task_model.items() if key not in ('init_image', 'init_images')},
+    'init_image_count': fields.Integer(description='Number of input images'),
     'task_id': fields.String(description='ID of the image generation task', default=None, required=False),
     'start_time': fields.String(description='Time when the image generation task was submitted', default=None, required=False),
     'compute_time': fields.String(description='Time when the image computation started', default=None, required=False),
@@ -715,7 +866,8 @@ class GetTasks(Resource):
         tasklist0 = []
         for task in tasklist:
             task0 = task.copy()
-            if 'image' in task0: del task0['image']
+            for field in ('image', 'init_images', 'init_image'):
+                task0.pop(field, None)
             tasklist0.append(task0)        
         return jsonify(tasklist0)
 
@@ -734,17 +886,30 @@ def redirect_to_index():
 def serve_index():
     return send_file(os.path.join(apppath, 'clients/web-ui/index.html'))
 
-def main():
+def build_argument_parser():
     parser = argparse.ArgumentParser(description='Start a server to generate images with mflux.')
-    parser.add_argument('--model', type=str, default=model, choices=MODEL_REGISTRY.keys(), help='The model to use (i.e. "schnell" or "dev").')
+    parser.add_argument('--model', type=str, default=DEFAULT_MODEL, choices=MODEL_REGISTRY.keys(), help='The model to use (default: flux2-klein-4b).')
     parser.add_argument('--quantize',  "-q", type=int, choices=[4, 8], default=None, help='Quantize the model (4 or 8, Default is None)')
     parser.add_argument('--host', type=str, default='127.0.0.1', help='The host to listen on')
     parser.add_argument('--port', type=int, default=4030, help='The port to listen on')
     parser.add_argument('--cache_limit', type=int, default=0, help='The metal cache limit in bytes')
+    parser.add_argument('--qwen21-context-cache', action=argparse.BooleanOptionalAction, default=True,
+                        help='Reuse invariant Qwen Image 2.1 per-layer context within each generation (default: enabled)')
+    parser.add_argument('--krea2-optimizations', action=argparse.BooleanOptionalAction, default=True,
+                        help='Prepare Krea 2 conditioning once and use native grouped attention (default: enabled)')
+    parser.add_argument('--flux2-optimizations', action=argparse.BooleanOptionalAction, default=True,
+                        help='Reuse FLUX.2 Klein 4B predictors and bounded encoder caches (default: enabled)')
+    return parser
+
+def main():
+    parser = build_argument_parser()
     args = parser.parse_args()
 
-    global metal_cache_limit
+    global metal_cache_limit, qwen21_context_cache, krea2_optimizations, flux2_optimizations
     metal_cache_limit = args.cache_limit
+    qwen21_context_cache = args.qwen21_context_cache
+    krea2_optimizations = args.krea2_optimizations
+    flux2_optimizations = args.flux2_optimizations
     threading.Thread(target=compute_image_task, daemon=True).start()
     load_model_runtime(args.model, args.quantize)
     print(f"Server started, view swagger API documentation at http://{args.host}:{args.port}/swagger")

@@ -1,56 +1,46 @@
-# Service Deployment on Mac Server
+# macOS service deployment
 
-This guide provides step-by-step instructions for installing and configuring a service to run automatically on a Macintosh.
-This service will start at boot, run independently of user login, and restart automatically if it crashes.
+Install Python 3.12 and the dependencies as described in the root README.
+Keep the repository at a stable location accessible to your user. The daemon
+runs `run.sh` as the user invoking sudo, including its dependency installation
+and model downloads. Authenticate to Hugging Face as that user if needed.
 
-## Prerequisites
+From the repository root:
 
-- Ensure you have administrative access to the Macintosh.
-- The service scripts are located at `triton_services/bin`.
-- The plist files are located at `triton_services/LaunchDaemons/`.
-
-## Installation Steps
-
-### Move the plist File to the Correct Location
-Copy the plit files from `service.plist` to `/Library/LaunchDaemons/`. This requires administrative privileges:
-
-```bash
-sudo cp ~/git/triton_services/LaunchDaemons/*.plist /Library/LaunchDaemons/
+```sh
+sudo ./deploy/deploy.sh --model qwen-image-2.1 --quantize 8
 ```
 
-### Set File Permissions
-Set the correct permissions for the plist file:
+All arguments are forwarded to `run.sh` and then `server.py`. Omitting them
+uses the server defaults (FLUX.2 Klein 4B, 4 steps, no quantization). `run.sh` binds
+to `0.0.0.0`; add `--host 127.0.0.1` to restrict access to this Mac.
 
-```bash
-sudo chown root:wheel /Library/LaunchDaemons/de.anomic.*.plist
-sudo chmod 644 /Library/LaunchDaemons/de.anomic.*.plist
+The script renders `de.anomic.mflux-server.plist.template` into
+`/Library/LaunchDaemons/de.anomic.mflux-server.plist`, sets root:wheel ownership,
+and reloads the service. It starts at boot and restarts if it exits. Re-run the
+deployment command with the desired arguments to change its model or options.
+Qwen Image 2.1 is provided by the pinned `mflux==0.20.0` dependency installed
+by `run.sh`.
+
+Inspect service status and the combined stdout/stderr log:
+
+```sh
+sudo launchctl list | grep de.anomic.mflux-server
+tail -f /tmp/de.anomic.mflux-server.log
 ```
 
-### Load the Service
-Load the service using the launchctl command:
+The service may be loaded while its initial weight download is still running.
+Check the log for the server startup message, then verify `/api/ps`:
 
-```bash
-sudo launchctl load -w /Library/LaunchDaemons/de.anomic.*.plist
+```sh
+curl http://localhost:4030/api/ps
 ```
 
-### Verify the Service
-Check if the service is loaded and running:
+For a reviewable plist without installing or starting a service:
 
-```bash
-sudo launchctl list | grep de.anomic
-```
-
-### Logging
-The service's standard output and error will be logged to:
-
-- Standard Output: /tmp/de.anomic.*.out.log
-- Standard Error: /tmp/de.anomic.*.err.log
-
-### Modifying the launch daemon
-
-After making changes to the .plist file, reload the daemon to apply the changes:
-
-```bash
-sudo launchctl unload /Library/LaunchDaemons/de.anomic.*.plist
-sudo launchctl load -w /Library/LaunchDaemons/de.anomic.*.plist
+```sh
+.venv/bin/python3.12 deploy/render_plist.py \
+  --username "$USER" --runscript "$PWD/run.sh" --output /tmp/mflux-server.plist \
+  -- --model qwen-image-2.1 --quantize 8
+plutil -lint /tmp/mflux-server.plist
 ```

@@ -1,0 +1,682 @@
+{
+  "categories": [
+    {
+      "name": "Primary Content or Foreground",
+      "tag": "foreground",
+      "boost": 5,
+      "examples": ["Persons", "Animals", "Vehicles", "Plants", "Buildings", "Tools", "Instruments", "Furniture", "Clothing", "Food", "Appliances", "Toys", "Gadgets", "Jewelry", "Artwork", "Books", "Musical Instruments", "Technology", "Natural Elements", "Household Items", "Artifacts"],
+      "type": "basic"
+    },
+    {
+      "name": "Location & Event",
+      "tag": "location_event",
+      "boost": 6,
+      "examples": ["Urban", "Rural", "Indoor", "Outdoor", "Concert", "Wedding", "Park", "Beach", "Mountain", "Cityscape", "Suburban", "Festival", "Market", "Museum", "Restaurant", "Sports Event", "Theater", "Airport", "Train Station", "Garden", "Farm", "Skyscraper", "Bridge", "Street", "Cafe", "Library"],
+      "type": "basic"
+    },
+    {
+      "name": "Mood",
+      "tag": "mood",
+      "boost": 2,
+      "examples": ["Joyful", "Melancholic", "Serene", "Tense", "Excited", "Nostalgic", "Peaceful", "Anxious", "Happy", "Somber", "Calm", "Angry", "Content", "Lonely", "Depressed", "Euphoric", "Worried", "Blissful", "Frustrated", "Grateful", "Sad", "Playful", "Stressed"],
+      "type": "basic"
+    },
+    {
+      "name": "Time of Year",
+      "tag": "season",
+      "boost": 6,
+      "examples": ["Atomic Winter", "Indian Summer", "Snowfall", "Autumn", "Spring", "Summer", "Winter", "Rainy Season", "Dry Season", "Monsoon", "Harvest Time", "Blossom Season", "Holiday Season", "Easter", "Thanksgiving", "Halloween", "Christmas", "New Year's", "Midsummer", "Equinox", "Solstice", "Early Spring", "Late Summer", "Barren Winter", "Frosty Mornings"],
+      "type": "basic"
+    },
+    {
+      "name": "Weather",
+      "tag": "weather",
+      "boost": 6,
+      "examples": ["Rainy", "Misty", "Stormy", "Snowy", "Cloudy", "Foggy", "Windy", "Sunny", "Overcast", "Humid", "Hazy", "Drizzly", "Blizzard", "Thunderstorm", "Hail", "Clear", "Breezy", "Icy", "Muggy", "Drought", "Lightning", "Tornado", "Heatwave", "Cold Snap"],
+      "type": "basic"
+    },
+    {
+      "name": "Secondary Content or Background",
+      "tag": "background",
+      "boost": 5,
+      "examples": ["Buildings", "Nature", "Forest", "Historic Ruins", "Jungle", "Landscape", "Garden", "Beachfront", "Urban Skyline", "Waterfall", "Valley", "Architecture", "Room", "Seascape", "Skyscrapers", "Desert", "Temple", "Mountainscape", "Cottage", "River", "Office", "Countryside", "Castle", "Interior"],
+      "type": "basic"
+    },
+    {
+      "name": "Color Palette",
+      "tag": "color_palette",
+      "boost": 4,
+      "examples": ["Earthy", "Neon", "Pastel", "Warm tones", "Cool tones", "Vibrant", "Neutral", "Muted", "Bold", "High Contrast", "Grayscale", "Sepia", "Saturated", "Analogous", "Complementary", "Gradient", "Duotone", "Polychromatic", "Bright", "Subdued", "Tonal", "Soft", "Rich", "Monochromatic"],
+      "type": "basic"
+    },
+    {
+      "name": "Artistic Style",
+      "tag": "style",
+      "boost": 2,
+      "examples": ["Realism", "Abstract", "Surrealism", "Minimalism", "Impressionism", "Expressionism", "Cubism", "Pop Art", "Futurism", "Dadaism", "Photorealism", "Pointillism", "Art Deco", "Constructivism", "Romanticism", "Symbolism", "Fantasy Art", "Gothic", "Baroque", "Art Nouveau", "Conceptual Art", "Hyperrealism", "Digital Art", "Street Art"],
+      "type": "basic"
+    },
+    {
+      "name": "Perspective & Composition",
+      "tag": "perspective",
+      "boost": 3,
+      "examples": ["Bird’s Eye", "Worm’s Eye", "Symmetry", "Rule of Thirds", "Close-Up", "Wide Angle", "Depth of Field", "Leading Lines", "Golden Ratio", "Diagonal Composition", "Framing", "Silhouette", "Tilted Perspective", "Forced Perspective", "High Angle", "Low Angle", "Reflection", "Foreground Focus", "Background Focus", "Centering", "Negative Space", "Asymmetry", "Panorama", "Motion Blur"],
+      "type": "basic"
+    },
+    {
+      "name": "Lighting",
+      "tag": "lighting",
+      "boost": 1,
+      "examples": ["Natural Light", "Artificial Light", "Low-key", "High-key", "Soft Light", "Hard Light", "Backlighting", "Side Lighting", "Golden Hour", "Blue Hour", "Candlelight", "Neon Light", "Spotlight", "Ambient Light", "Fill Light", "Rembrandt Lighting", "Split Lighting", "Rim Light", "Bounce Light", "Underlighting", "Diffused Light", "Overexposure", "Underexposure", "Chiaroscuro"],
+      "type": "basic"
+    },
+    {
+      "name": "Theme & Concept",
+      "tag": "theme",
+      "boost": 7,
+      "examples": ["Post-Apocalyptic", "Cyberpunk", "Epic", "Noir", "Dystopian", "Futuristic", "Fantasy", "Gothic", "Steampunk", "Mystical", "Whimsical", "Medieval", "Utopian", "Mythological", "Sci-Fi", "Adventure", "Historical", "Supernatural", "Urban Fantasy", "Paranormal", "Retro", "Horror", "Surreal", "Romantic"],
+      "type": "basic"
+    },
+    {
+      "name": "Genre",
+      "tag": "genre",
+      "boost": 3,
+      "examples": ["Landscape", "Portrait", "Street Photography", "Wildlife", "Macro", "Astrophotography", "Aerial", "Underwater", "Architectural", "Documentary", "Fashion", "Sports", "Candid", "Travel", "Fine Art", "Event Photography", "Photojournalism", "Nature", "Pet Photography", "Food Photography", "Black and White", "Action", "Night Photography", "Abstract Photography"],
+      "type": "basic"
+    },
+    {
+      "name": "Photographic Techniques",
+      "tag": "techniques",
+      "boost": 1,
+      "examples": ["Long Exposure", "Macro", "Panorama", "Black and White", "Time-lapse", "HDR", "Tilt-Shift", "Infrared", "Bokeh", "Multiple Exposure", "Light Painting", "Motion Blur", "High-Speed", "Double Exposure", "Pinhole", "Split Toning", "Fisheye", "Focus Stacking", "Selective Color", "Drone Photography", "Cinemagraph", "Low Light", "Vignette", "Depth of Field"],
+      "type": "basic"
+    },
+    {
+      "name": "Action & Dynamics",
+      "tag": "action",
+      "boost": 1,
+      "examples": ["Stillness", "Movement", "Speed", "Relaxation", "Tension", "Flow", "Energy", "Calm", "Chaos", "Harmony", "Intensity", "Grace", "Burst", "Fluidity", "Rush", "Momentum", "Tranquility", "Frenzy", "Pause", "Vibration", "Balance", "Pulse", "Serenity", "Acceleration"],
+      "type": "basic"
+    },
+    {
+      "name": "Cultural & Ethnic Context",
+      "tag": "cultural",
+      "boost": 1,
+      "examples": ["Specific Cultures", "Traditions", "Nationalities", "Folklore", "Rituals", "Customs", "Festivals", "Ethnicities", "Mythology", "Cultural Heritage", "Languages", "Religions", "Art Forms", "Cuisine", "Costumes", "Celebrations", "Ceremonies", "Music Styles", "Dance Forms", "Handicrafts", "Historical Events", "Architectural Styles", "Social Norms", "Oral Traditions"],
+      "type": "basic"
+    },
+    {
+      "name": "Symbolism & Metaphor",
+      "tag": "symbolism",
+      "boost": 1,
+      "examples": ["Symbolic Meanings", "Allegories", "Abstract Concepts", "Metaphors", "Emblems", "Icons", "Parables", "Personification", "Analogies", "Mythic Symbols", "Archetypes", "Ritual Symbols", "Moral Lessons", "Cultural Symbols", "Spiritual Symbols", "Mystical Symbols", "Figurative Language", "Signifiers", "Symbolic Colors", "Conceptual Art", "Symbolic Objects", "Representations", "Imagery"],
+      "type": "basic"
+    },
+    {
+      "name": "Medium & Material",
+      "tag": "medium",
+      "boost": 2,
+      "examples": ["Painting", "Digital Art", "Photography", "Mixed Media", "Sculpture", "Collage", "Printmaking", "Illustration", "Graphic Design", "Ceramics", "Textile Art", "Video Art", "Installation Art", "Street Art", "Watercolor", "Oil Painting", "Acrylic Painting", "Charcoal Drawing", "Ink Art", "Mosaic", "Glass Art", "Woodworking", "Metalwork", "Performance Art"],
+      "type": "basic"
+    },
+    {
+      "name": "Function & Use",
+      "tag": "function",
+      "boost": 2,
+      "examples": ["Educational", "Commercial", "Promotional", "Artistic Expression", "Documentary", "Informational", "Instructional", "Entertainment", "Advocacy", "Branding", "Marketing", "Public Service", "Inspirational", "Cultural Preservation", "Editorial", "Corporate", "Exhibition", "Storytelling", "Interactive", "Propaganda", "Social Commentary", "Awareness Campaign", "Therapeutic", "Personal Development"],
+      "type": "basic"
+    },
+    {
+      "name": "Subject Matter",
+      "tag": "subject",
+      "boost": 2,
+      "examples": ["Historical", "Scientific", "Mythological", "Fictional", "Archaeological", "Philosophical", "Biographical", "Technological", "Folkloric", "Legendary", "Speculative", "Documentary", "Fantasy", "Religious", "Exploratory", "Political", "Cultural", "Pseudoscientific", "Epic", "Alternate History", "Mystery", "Adventure", "Metaphysical", "Urban Legend"],
+      "type": "basic"
+    },
+    {
+      "name": "Emotional Impact",
+      "tag": "emotion",
+      "boost": 3,
+      "examples": ["Calming", "Disturbing", "Joyful", "Melancholic", "Uplifting", "Haunting", "Serene", "Anxious", "Content", "Heartwarming", "Eerie", "Tranquil", "Dismal", "Inspiring", "Gloomy", "Soothing", "Chilling", "Exhilarating", "Nostalgic", "Comforting", "Mysterious", "Bittersweet", "Oppressive"],
+      "type": "basic"
+    },
+    {
+      "name": "Interaction & Focus",
+      "tag": "interaction",
+      "boost": 2,
+      "examples": ["Solo", "Group", "Crowd", "Focus on Detail", "Pair", "Duo", "Family", "Team", "Gathering", "Cluster", "Mob", "Lineup", "Isolated", "Close-up", "Panoramic", "Interaction", "Connection", "Contrast", "Silhouette", "Perspective", "Foreground", "Background", "Interaction", "Juxtaposition"]
+    },
+    {
+      "name": "Texture & Material",
+      "tag": "texture",
+      "boost": 2,
+      "examples": ["Smooth", "Rough", "Glossy", "Matte", "Textured", "Velvety", "Grainy", "Silky", "Coarse", "Polished", "Rustic", "Bumpy", "Shiny", "Satin", "Soft", "Waxy", "Metallic", "Pebbled", "Fibrous", "Brushed", "Oily", "Embossed", "Gritty", "Reflective"],
+      "type": "basic"
+    },
+    {
+      "name": "Scale & Proportion",
+      "tag": "scale",
+      "boost": 3,
+      "examples": ["Macro", "Micro", "Life-size", "Exaggerated", "Miniature", "Close-up", "Zoomed-in", "Full-scale", "Oversized", "Magnified", "Diminished", "Detailed", "Proportional", "Enlarged", "Scaled-down", "Hyper-realistic", "Abstracted", "Stretched", "Compressed", "Distorted", "Giant", "Tiny", "Expansive", "Shrunken"],
+      "type": "basic"
+    },
+    {
+      "name": "Symbolic vs. Literal Representation",
+      "tag": "representation",
+      "boost": 1,
+      "examples": ["Iconic", "Symbolic", "Realistic", "Interpretative", "Literal", "Abstract", "Metaphorical", "Representational", "Allegorical", "Stylized", "Figurative", "Emblematic", "Surreal", "Conceptual", "Illustrative", "Suggestive", "Impressionistic", "Expressionistic", "Pictorial", "Descriptive", "Allusive", "Evocative", "Narrative", "Idealized"],
+      "type": "basic"
+    },
+    {
+      "name": "Seasonality & Festivity",
+      "tag": "seasonality",
+      "boost": 4,
+      "examples": ["Celebrations", "Holidays", "Seasonal Changes", "Festivals", "Anniversaries", "Rituals", "Harvest Festivals", "Religious Observances", "Cultural Events", "Family Gatherings", "National Holidays", "Solstices", "Equinoxes", "Carnivals", "New Year's Eve", "Graduations", "Weddings", "Birthdays", "Milestones", "Traditions", "Ceremonies", "Fairs", "Parades"],
+      "type": "basic"
+    },
+    {
+      "name": "Era or Historical Period",
+      "tag": "era",
+      "boost": 5,
+      "examples": ["Cyberpunk", "Post-apocalyptic", "Space Age", "Steam Age", "Atomic Era", "Ancient", "Medieval", "Victorian", "Futuristic", "Industrial", "Prehistoric", "Modern", "Renaissance", "Classical", "Baroque", "Gothic", "Colonial", "Enlightenment", "Retro", "Stone Age", "Bronze Age", "Dark Ages", "Golden Age", "Feudal"],
+      "type": "basic"
+    },
+    {
+      "name": "Objective",
+      "tag": "objective",
+      "boost": 2,
+      "examples": ["Wallpapers", "Illustrations", "Decorations", "Murals", "Posters", "Prints", "Banners", "Stickers", "Sculptures", "Paintings", "Tapestries", "Collages", "Graffiti", "Carvings", "Mosaics", "Embroidery", "Silhouettes", "Icons", "Logos", "Sketches", "Signs", "Frescoes", "Ornaments"],
+      "type": "basic"
+    },
+    {
+      "name": "Sports Type",
+      "tag": "sports_type",
+      "boost": 2,
+      "examples": ["Football", "Basketball", "Tennis", "Martial Arts", "Soccer", "Baseball", "Hockey", "Golf", "Boxing", "Rugby", "Volleyball", "Cricket", "Swimming", "Gymnastics", "Track and Field", "Wrestling", "Cycling", "Surfing", "Skiing", "Snowboarding", "Badminton", "Table Tennis", "Fencing", "Rowing"],
+      "type": "hobby"
+    },
+    {
+      "name": "Sports Dynamics",
+      "tag": "sports_dynamics",
+      "boost": 2,
+      "examples": ["Action Shot", "Celebration", "Team Play", "Victory", "Defensive Play", "Dribbling", "Goal Scoring", "Sprint Finish", "Tackle", "Pass", "Save", "High Five", "Huddle", "Handshake", "Medal Ceremony", "Podium Finish", "Cheering Crowd", "Penalty Kick", "Time Out", "Injury", "Coaching", "Substitution", "Overtime", "Championship Win"],
+      "type": "hobby"
+    },
+    {
+      "name": "Automobile Type",
+      "tag": "automobile_type",
+      "boost": 1,
+      "examples": ["Sports Car", "SUV", "Motorcycle", "Classic Car", "Convertible", "Pickup Truck", "Luxury Sedan", "Coupe", "Hatchback", "Minivan", "Electric Vehicle", "Hybrid", "Off-Roader", "Dragster", "Roadster", "Touring Bike", "Cruiser", "Muscle Car", "Vintage Car", "Racing Bike", "Dirt Bike", "Limousine", "Crossover", "Hot Rod"],
+      "type": "hobby"
+    },
+    {
+      "name": "Automobile Scene",
+      "tag": "automobile_scene",
+      "boost": 1,
+      "examples": ["Racing", "Off-Road", "Urban Drive", "Showroom", "Cruising", "Drifting", "Drag Racing", "Track Day", "Highway Drive", "Car Meet", "Road Trip", "Night Drive", "Test Drive", "Autocross", "Car Show", "Rallying", "Traffic Jam", "Mountain Pass", "Coastal Drive", "Desert Drive", "Tunnel Drive", "City Cruise", "Parking Lot", "Pit Stop"],
+      "type": "hobby"
+    },
+    {
+      "name": "Gaming Genre",
+      "tag": "gaming_genre",
+      "boost": 3,
+      "examples": ["RPG", "FPS", "Strategy", "Simulation", "MMORPG", "Action-Adventure", "Platformer", "Puzzle", "Sandbox", "MOBA", "Battle Royale", "Racing Game", "Sports Game", "Survival Horror", "Fighting Game", "Tactical Shooter", "Stealth Game", "Visual Novel", "Turn-Based Strategy", "Real-Time Strategy", "Rhythm Game", "Hack and Slash", "Tower Defense", "Open World"],
+      "type": "hobby"
+    },
+    {
+      "name": "Gaming Platform",
+      "tag": "gaming_platform",
+      "boost": 1,
+      "examples": ["PC", "Console", "Mobile", "Arcade", "Handheld", "VR", "Cloud Gaming", "Smart TV", "Browser-Based", "Retro Console", "Portable Console", "Gaming Laptop", "Smartwatch", "Home Console", "Esports Arena", "Streaming Service", "Motion Controller", "Augmented Reality", "Plug and Play", "Tablet", "Gaming Chair", "Flight Simulator", "Gaming Rig", "Hybrid Console"],
+      "type": "hobby"
+    },
+    {
+      "name": "Gaming Culture",
+      "tag": "gaming_culture",
+      "boost": 2,
+      "examples": ["Esports", "Streaming", "Retro Gaming", "Cosplay", "Speedrunning", "Modding", "Game Development", "LAN Parties", "Indie Games", "Game Collecting", "Fan Art", "Game Reviews", "Competitive Gaming", "Tournaments", "Game Jams", "Virtual Reality Gaming", "Game Communities", "Machinima", "Gaming Merchandise", "Live Commentary", "Let's Plays", "In-Game Events", "Character Design", "Roleplaying Communities"],
+      "type": "hobby"
+    },
+    {
+      "name": "Comic Style",
+      "tag": "comic_style",
+      "boost": 3,
+      "examples": ["Cyberpunk Comic", "Manga", "Graphic Novel", "Epic Saga", "Webcomic", "Comic Strip", "Anime", "Fantasy Comic", "Science Fiction Comic", "Dark Comic", "Slice of Life", "Supervillain", "Adventure Comic", "Comedy Comic", "Horror Comic", "Detective Comic", "Historical Comic", "Alternative Comics", "Underground Comic", "Romance Comic", "Mystery Comic", "War Comic", "Anthology", "Superhero"],
+      "type": "hobby"
+    },
+    {
+      "name": "Comic Characters",
+      "tag": "comic_characters",
+      "boost": 4,
+      "examples": ["Villains", "Cybernetic Beings", "Antiheroes", "Superheroes", "Arch-nemeses", "Rogues", "Masterminds", "Rivals", "Legendary Heroes", "Alien Invaders", "Mutants", "Crime Lords", "Wizards", "Detectives", "Shape-shifters", "Mythical Creatures"],
+      "type": "hobby"
+    },
+    {
+      "name": "Science Fiction Setting",
+      "tag": "sci_fi_setting",
+      "boost": 9,
+      "examples": ["Dystopian Future", "Cyberpunk City", "Post-Apocalyptic Wasteland", "Space Station", "Space", "Martian Colony", "Underground Bunker", "Abandoned Spaceship", "Parallel Universe", "Asteroid Field", "Futuristic Megacity", "Artificial Intelligence Utopia", "Interstellar Battlefield", "Robotic Overlords", "Quantum Realm", "Time-Travel Paradox", "Desolate Moon", "Hidden Alien Base", "Starship", "Cosmic Anomaly", "Alien Planet", "Galactic Empire", "Virtual Reality World", "Deep Space Exploration"],
+      "type": "hobby"
+    },
+    {
+      "name": "Science Fiction Elements",
+      "tag": "sci_fi_elements",
+      "boost": 9,
+      "examples": ["Spaceships", "Robots", "Space Colonies", "Cybernetic Enhancements", "Time Travel", "Alien Species", "Teleportation", "Space Suits", "Quantum Computers", "Holograms", "AI Companions", "Wormholes",  "Exoskeletons", "Androids", "Cloning", "Cryogenic Sleep", "Energy Shields", "Star Gates", "Mind Uploading", "Galactic Federation", "Nanotechnology", "Alien Artifacts", "Genetic Engineering"],
+      "type": "hobby"
+    },
+    {
+      "name": "Fantasy Creatures",
+      "tag": "fantasy_creatures",
+      "boost": 4,
+      "examples": ["Dragons", "Elves", "Orcs", "Unicorns", "Fairies", "Goblins", "Trolls", "Dwarves", "Mermaids", "Giants", "Phoenixes", "Centaurs", "Werewolves", "Vampires", "Griffins", "Golems", "Krakens", "Chimeras", "Leprechauns", "Nymphs", "Hydras", "Minotaurs", "Banshees", "Djinn"],
+      "type": "hobby"
+    },
+    {
+      "name": "Fantasy Settings",
+      "tag": "fantasy_settings",
+      "boost": 9,
+      "examples": ["Hidden Village", "Ancient Ruins", "Haunted Castle", "Crystal Cavern", "Medieval Kingdom", "Enchanted Forest", "Dark Tower", "Mystical Island", "Sacred Grove", "Lost City", "Cursed Swamp", "Floating Fortress", "Desert Oasis", "Dragon's Lair", "Underwater Kingdom", "Mountain Stronghold", "Eternal Winterland", "Secret Garden", "Forbidden Temple", "Arcane Library", "Wishing Well", "Sky Realm", "Mystic River", "Timeless Valley"],
+      "type": "hobby"
+    },
+    {
+      "name": "Superhero Themes",
+      "tag": "superhero_themes",
+      "boost": 7,
+      "examples": ["Clash of Titans", "Rebellion", "Hero's Journey", "Secret Identity", "Epic Battle", "Moral Dilemma", "Redemption Arc", "Betrayal", "Quest for Power", "Sacrifice", "Forbidden Love", "Rise to Power", "Destiny Fulfilled", "Fall from Grace", "Mentorship", "Courage Under Fire", "Inner Conflict", "Lost Legacy", "Ancient Prophecy", "Coming of Age", "Alliance of Rivals", "Tragic Flaw", "Legacy of the Ancients", "Prophetic Dream"],
+      "type": "hobby"
+    },
+    {
+      "name": "Vehicle Customization",
+      "tag": "vehicle_customization",
+      "boost": 2,
+      "examples": ["Tuning", "Decals", "Spoilers", "Custom Paint Jobs", "Lowered Suspension", "Performance Exhaust", "Racing Stripes", "Aftermarket Wheels", "LED Underglow", "Turbocharger", "Body Kits", "Carbon Fiber Hood", "Nitrous Oxide System", "Roll Cage", "Tinted Windows", "Custom Interiors", "Racing Seats", "Widebody Kit", "Engine Swap", "Vinyl Wraps", "Air Suspension", "Sound System Upgrades", "Racing Pedals", "Custom Grille"],
+      "type": "hobby"
+    },
+    {
+      "name": "Motorsports",
+      "tag": "motorsports",
+      "boost": 1,
+      "examples": ["Off-Road Racing", "Dakar Rally", "Supercross", "Formula 1", "NASCAR", "Rally", "MotoGP", "Le Mans", "IndyCar", "Drag Racing", "Touring Car", "Superbike", "Drifting", "Karting", "Endurance Racing", "World Rally Championship", "Hill Climb", "Time Attack", "Baja 1000", "Isle of Man TT", "Street Racing", "Track Days", "Vintage Racing", "Rallycross"],
+      "type": "hobby"
+    },
+    {
+      "name": "Gadgets & Tech",
+      "tag": "gadgets_tech",
+      "boost": 4,
+      "examples": ["Gaming Consoles", "VR Headsets", "Custom PCs", "Smartphones", "Gaming Keyboards", "Gaming Mice", "Gaming Monitors", "Gaming Chairs", "Graphics Cards", "Gaming Headsets", "Portable Consoles", "Gaming Controllers", "External Hard Drives", "Streaming Equipment", "Cooling Systems", "Mechanical Keyboards", "RGB Lighting", "Capture Cards", "Gaming Laptops", "VR Controllers", "Modding Kits", "Gaming Routers", "Cable Management Systems", "Docking Stations"],
+      "type": "hobby"
+    },
+    {
+      "name": "Nerd Collectibles",
+      "tag": "nerd_collectibles",
+      "boost": 1,
+      "examples": ["Action Figures", "Comic Books", "Trading Cards", "Memorabilia", "Statues", "Collectible Posters", "Limited Edition Prints", "Model Kits", "Board Games", "Plush Toys", "Autographed Items", "Enamel Pins", "Vinyl Records", "Art Books", "Replicas", "Collector's Coins", "Miniatures", "Puzzle Boxes", "Graphic Novels",  "Arcade Cabinets", "Toy Sets", "Collector's Edition Games", "Die-Cast Cars"],
+      "type": "hobby"
+    },
+    {
+      "name": "Mathematics",
+      "tag": "mathematics",
+      "boost": 2,
+      "examples": ["Geometry", "Calculus", "Algebra", "Probability", "Trigonometry", "Number Theory", "Linear Algebra", "Differential Equations", "Statistics", "Complex Analysis", "Topology", "Set Theory", "Graph Theory", "Mathematical Logic", "Game Theory", "Combinatorics", "Cryptography", "Mathematical Modeling", "Numerical Analysis", "Abstract Algebra", "Discrete Mathematics", "Real Analysis", "Vector Calculus", "Dynamical Systems"],
+      "type": "science"
+    },
+    {
+      "name": "Geology",
+      "tag": "geology",
+      "boost": 3,
+      "examples": ["Volcanoes", "Earthquakes", "Minerals", "Fossils", "Tectonic Plates", "Erosion", "Sedimentary Rocks", "Caves", "Geysers", "Glaciers", "Landslides", "Magma Chambers", "Metamorphic Rocks", "Geodes", "Canyons", "Sinkholes", "Lava Flows", "Fault Lines", "Geothermal Springs", "Rock Strata", "Tsunamis", "Crystal Formations", "Meteorites", "Petrified Wood"],
+      "type": "science"
+    },
+    {
+      "name": "Environmental Science",
+      "tag": "environmental_science",
+      "boost": 1,
+      "examples": ["Climate Change", "Conservation", "Pollution", "Renewable Energy", "Deforestation", "Biodiversity", "Sustainability", "Endangered Species", "Carbon Footprint", "Eco-Friendly Technologies", "Greenhouse Gases", "Recycling Programs", "Habitat Restoration", "Ocean Acidification", "Global Warming", "Environmental Policy", "Air Quality", "Waste Management", "Alternative Energy", "Reforestation", "Water Conservation", "Climate Activism", "Ecosystem Services", "Sustainable Agriculture"],
+      "type": "science"
+    },
+    {
+      "name": "Meteorology",
+      "tag": "meteorology",
+      "boost": 1,
+      "examples": ["Weather Patterns", "Storms", "Climate", "Forecasting", "Temperature Variations", "Hurricanes", "Droughts", "Rainfall", "Snowstorms", "Heatwaves", "Cold Fronts", "Tornadoes", "Monsoons", "Atmospheric Pressure", "Humidity", "Jet Streams", "Cyclones", "El Niño", "La Niña", "Thunderstorms", "Blizzards", "Wind Currents", "Microclimates", "Seasonal Shifts"],
+      "type": "science"
+    },
+    {
+      "name": "Genetics",
+      "tag": "genetics",
+      "boost": 1,
+      "examples": ["DNA", "Genomes", "Gene Editing", "Hereditary Diseases", "Chromosomes", "Mutations", "Genetic Markers", "Genetic Engineering", "CRISPR", "Gene Therapy", "Epigenetics", "Mitochondrial DNA", "Genetic Sequencing", "Inheritance Patterns", "Genetic Disorders", "Transgenic Organisms", "Gene Expression", "Genetic Counseling", "Mendelian Genetics", "Population Genetics", "Genetic Drift", "Personalized Medicine", "Genomic Data", "Phenotypes"],
+      "type": "science"
+    },
+    {
+      "name": "Neuroscience",
+      "tag": "neuroscience",
+      "boost": 1,
+      "examples": ["Brain", "Neurons", "Cognitive Functions", "Neuroplasticity", "Synapses", "Cerebral Cortex", "Memory Formation", "Neurotransmitters", "Brainstem", "Hippocampus", "Neural Networks", "Brainwaves", "Sensory Processing", "Motor Control", "Prefrontal Cortex", "Amygdala", "Neurogenesis", "Central Nervous System", "Myelin", "Cognitive Decline", "Executive Functions", "Learning Pathways", "Emotional Regulation", "Brain-Computer Interface"],
+      "type": "science"
+    },
+    {
+      "name": "Astrobiology",
+      "tag": "astrobiology",
+      "boost": 4,
+      "examples": ["Life on Other Planets", "Extremophiles", "Search for Extraterrestrial Life", "Exoplanets", "Astrobiology", "Biosignatures", "Habitability Zones", "Mars Colonization", "Alien Microorganisms", "Panspermia", "Space Biospheres", "Terraforming", "Alien Civilizations", "Ice Moons", "Astrobiomes", "Planetary Atmospheres", "SETI (Search for Extraterrestrial Intelligence)", "Astrochemistry", "Interstellar Communication", "Alien Ecosystems", "Fermi Paradox", "Galactic Habitable Zone", "Organic Molecules in Space", "Exobiology"],
+      "type": "science"
+    },
+    {
+      "name": "Nanotechnology",
+      "tag": "nanotechnology",
+      "boost": 3,
+      "examples": ["Nanomaterials", "Nanomedicine", "Nanorobots", "Quantum Dots", "Nanotubes", "Nanosensors", "Nanoelectronics", "Nanofabrication", "Nanoparticles", "Nanocomposites", "Nanocapsules", "Self-Assembly", "Nanocatalysts", "Molecular Nanotechnology", "Nanophotonics", "Nanostructures", "Nanowires", "Nanofilms", "Nanocoatings", "Nanofibers", "Drug Delivery Systems", "Nanoengineering", "Nanolithography", "Bionanotechnology"],
+      "type": "science"
+    },
+    {
+      "name": "Oceanography",
+      "tag": "oceanography",
+      "boost": 5,
+      "examples": ["Aquatic Habitats", "Deep Sea Exploration", "Submarine Volcanoes", "Mangroves", "Marine Life", "Coral Reefs", "Ocean Currents", "Underwater Ecosystems", "Marine Biology", "Tidal Zones", "Whale Migration", "Sharks", "Seagrass Beds", "Marine Conservation", "Hydrothermal Vents", "Plankton", "Ocean Acidification", "Deep Sea Creatures", "Ocean Trenches", "Kelp Forests", "Marine Mammals", "Sea Turtles", "Marine Pollution", "Fish Spawning"],
+      "type": "science"
+    },
+    {
+      "name": "Paleontology",
+      "tag": "paleontology",
+      "boost": 2,
+      "examples": ["Pangaea", "Evolutionary History", "Mesozoic Era", "Dinosaurs", "Fossils", "Prehistoric Life", "Paleontology", "Extinct Species", "Ice Age", "Mammoths", "Cretaceous Period", "Archaeopteryx", "Paleoecology", "Fossilized Plants", "Jurassic Period", "Megafauna", "Trilobites", "Cambrian Explosion", "Fossil Record", "Ancient Ecosystems", "Evolution of Mammals", "Permian Extinction", "Fossil Excavation", "Early Hominins"],
+      "type": "science"
+    },
+    {
+      "name": "Ecology",
+      "tag": "ecology",
+      "boost": 5,
+      "examples": ["Species Extinction", "Deforestation", "Soil Erosion", "Biosphere", "Habitat Loss", "Endangered Species", "Ecosystems", "Biodiversity", "Conservation", "Food Chains", "Ecological Balance", "Pollinators", "Wildlife Corridors", "Invasive Species", "Symbiosis", "Trophic Levels", "Keystone Species", "Ecological Restoration", "Wetland Preservation", "Coral Bleaching", "Carbon Sequestration", "Climate Resilience", "Marine Ecosystems", "Sustainable Practices"],
+      "type": "science"
+    },
+    {
+      "name": "Space Exploration Missions",
+      "tag": "space_missions",
+      "boost": 4,
+      "examples": ["Apollo", "Voyager", "Curiosity Rover", "James Webb Telescope", "Artemis", "Hubble Space Telescope", "Cassini", "New Horizons", "Mars Pathfinder", "Galileo", "Pioneer", "Lunar Orbiter", "Viking", "Chandra X-Ray Observatory", "Juno", "Rosetta", "Kepler", "SOHO", "InSight", "OSIRIS-REx", "MESSENGER", "TESS", "Europa Clipper", "Perseverance Rover"],
+      "type": "science"
+    },
+    {
+      "name": "Quantum Computing",
+      "tag": "quantum_computing",
+      "boost": 4,
+      "examples": ["Qubits", "Quantum Algorithms", "Quantum Entanglement", "Quantum Cryptography", "Quantum Superposition", "Quantum Decoherence", "Quantum Gates", "Quantum Computing Hardware", "Quantum Annealing", "Quantum Simulation", "Quantum Teleportation", "Quantum Key Distribution", "Quantum Error Correction", "Quantum Networking", "Quantum Supremacy", "Quantum Tunneling", "Quantum Fourier Transform", "Quantum Machine Learning", "Quantum Circuits", "Quantum State Measurement", "Quantum Bit Error Rate", "Quantum Information Theory", "Quantum Cloning", "Quantum Speedup"],
+      "type": "science"
+    },
+    {
+      "name": "Natural Landscapes",
+      "tag": "natural_landscapes",
+      "boost": 9,
+      "examples": ["Mountains", "Forests", "Oceans", "Canyons", "Valleys", "Grasslands", "Deserts", "Rivers", "Lakes", "Waterfalls", "Savannas", "Glaciers", "Volcanoes", "Wetlands", "Plains", "Tundra", "Islands", "Coral Reefs", "Fjords", "Mangroves", "Dunes", "Caves", "Swamps", "Cliffs"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Flora & Fauna",
+      "tag": "flora_fauna",
+      "boost": 8,
+      "examples": ["Moss", "Grasses", "Wildflowers", "Trees", "Birds", "Insects", "Ferns", "Shrubs", "Butterflies", "Bees", "Reptiles", "Amphibians", "Vines", "Mammals", "Fish", "Cacti", "Algae", "Herbs", "Bats", "Spiders", "Flowering Plants", "Conifers", "Frogs"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Seasons & Cycles",
+      "tag": "seasons_cycles",
+      "boost": 8,
+      "examples": ["Snowfall", "Falling Leaves", "Storm Clouds", "Rainbow", "Spring Blossoms", "Autumn Leaves", "Tides", "Lunar Phases", "Winter Frost", "Summer Solstice", "Morning Dew", "Sunset Glow", "Monsoon Rains", "Harvest Moon", "Migrating Birds", "Cherry Blossoms", "Aurora Borealis", "High Tide", "Low Tide", "Equinox", "Wildflower Bloom", "First Snow", "Ripe Harvest", "Changing Seasons"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Wilderness & Survival",
+      "tag": "wilderness_survival",
+      "boost": 6,
+      "examples": ["Prepper", "Survival", "Star Gazing", "Camouflage", "Camping", "Bushcraft", "Wildlife Tracking", "Backpacking", "Foraging", "Shelter Building", "Fire Starting", "Navigation", "Fishing", "Knot Tying", "Hiking", "River Crossing", "Rock Climbing", "Bird Watching", "Trail Blazing", "Water Purification", "Outdoor Cooking", "First Aid", "Wild Edibles", "Primitive Tools", "Cold Weather Survival"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Environmental Awareness",
+      "tag": "environmental_awareness",
+      "boost": 3,
+      "examples": ["Sustainability", "Conservation", "Pollution Awareness", "Recycling", "Zero Waste", "Renewable Resources", "Eco-Friendly Products", "Energy Efficiency", "Water Conservation", "Carbon Footprint Reduction", "Sustainable Agriculture", "Green Building", "Composting", "Circular Economy", "Plastic Reduction", "Wildlife Protection", "Environmental Education", "Climate Action", "Sustainable Transportation", "Organic Farming", "Tree Planting", "Biodiversity Preservation", "Clean Energy", "Sustainable Tourism"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Philosophical Schools",
+      "tag": "philosophical_schools",
+      "boost": 1,
+      "examples": ["Stoicism", "Existentialism", "Buddhism", "Taoism", "Confucianism", "Hedonism", "Nihilism", "Absurdism", "Transcendentalism", "Humanism", "Platonism", "Zen", "Epicureanism", "Utilitarianism", "Determinism", "Skepticism", "Pragmatism", "Idealism", "Materialism", "Pantheism", "Objectivism", "Phenomenology", "Deism", "Spiritualism"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Ethics & Morality",
+      "tag": "ethics_morality",
+      "boost": 1,
+      "examples": ["Virtue Ethics", "Deontology", "Utilitarianism", "Moral Dilemmas", "Consequentialism", "Moral Relativism", "Ethical Egoism", "Divine Command Theory", "Care Ethics", "Natural Law", "Contractarianism", "Ethical Intuitionism", "Situation Ethics", "Moral Absolutism", "Kantian Ethics", "Eudaimonia", "Altruism", "Ethical Hedonism", "Ethical Subjectivism", "Moral Objectivism", "Golden Mean", "Duty Ethics", "Moral Responsibility", "Rights-Based Ethics"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Mindfulness & Meditation",
+      "tag": "mindfulness_meditation",
+      "boost": 3,
+      "examples": ["Breathing Exercises", "Body Scan", "Mindful Walking", "Zen Meditation", "Guided Visualization", "Loving-Kindness Meditation", "Mantra Meditation", "Progressive Muscle Relaxation", "Vipassana", "Chakra Meditation", "Mindful Eating", "Transcendental Meditation", "Yoga Nidra", "Gratitude Meditation", "Focused Attention Meditation", "Sound Bath", "Mindful Stretching", "Candle Gazing", "Metta Bhavana", "Qigong", "Mindful Journaling", "Pranayama", "Silent Retreats", "Walking Labyrinths"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Mental States",
+      "tag": "mental_states",
+      "boost": 3,
+      "examples": ["Calmness", "Anxiety", "Focus", "Creativity", "Joy", "Sadness", "Excitement", "Frustration", "Contentment", "Overwhelm", "Inspiration", "Restlessness", "Determination", "Worry", "Mindfulness", "Confusion", "Motivation", "Apathy", "Optimism", "Fear", "Curiosity", "Relaxation", "Anticipation", "Flow"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Enlightenment",
+      "tag": "enlightenment",
+      "boost": 3,
+      "examples": ["Awakening", "Self-Realization", "Nirvana", "Samadhi", "Enlightenment", "Transcendence", "Spiritual Liberation", "Higher Consciousness", "Unity with the Divine", "Cosmic Awareness", "Inner Peace", "Mystical Union", "Ego Dissolution", "Kundalini Rising", "Divine Insight", "Non-duality", "Soul Connection", "Bliss", "Satori", "Spiritual Awakening", "Oneness", "Ascension", "Pure Awareness", "Divine Communion"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Spiritual Practices",
+      "tag": "spiritual_practices",
+      "boost": 3,
+      "examples": ["Yoga", "Chanting", "Prayer", "Rituals", "Meditation", "Mantras", "Pilgrimage", "Fasting", "Sacred Dance", "Breathwork", "Sacred Geometry", "Healing Circles", "Candle Lighting", "Holy Water", "Incense Burning", "Tai Chi", "Ceremonial Offerings", "Anointing", "Labyrinth Walking", "Drumming", "Affirmations", "Singing Bowls", "Mudras", "Sacred Symbols"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Consciousness",
+      "tag": "consciousness",
+      "boost": 2,
+      "examples": ["Awareness", "Self-Consciousness", "Subconscious", "Collective Consciousness", "Mindfulness", "Intuition", "Higher Self", "Unconscious Mind", "Ego", "Altered States", "Metacognition", "Dream States", "Flow State", "Inner Dialogue", "Transpersonal Consciousness", "Archetypal Mind", "Lucid Dreaming", "Shadow Self", "Cosmic Consciousness", "Superconscious", "Stream of Consciousness", "Thought Awareness", "Psychic Awareness", "Group Mind"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Wisdom Traditions",
+      "tag": "wisdom_traditions",
+      "boost": 2,
+      "examples": ["Ancient Texts", "Sages", "Proverbs", "Teachings", "Scriptures", "Parables", "Wisdom Traditions", "Philosophical Dialogues", "Sacred Writings", "Oral Traditions", "Manuscripts", "Ethical Maxims", "Spiritual Discourses", "Holy Scriptures", "Esoteric Knowledge", "Moral Tales", "Epigrams", "Classical Philosophy", "Mystical Insights", "Sacred Lore", "Mythical Stories", "Doctrines", "Meditative Verses", "Gnostic Gospels"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Human Experience",
+      "tag": "human_experience",
+      "boost": 3,
+      "examples": ["Joy", "Suffering", "Love", "Loss", "Grief", "Compassion", "Despair", "Anger", "Forgiveness", "Ecstasy", "Heartache", "Courage", "Loneliness", "Empathy", "Resilience", "Regret", "Fulfillment", "Sadness", "Yearning", "Connection", "Disappointment", "Trust", "Healing"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Mysticism",
+      "tag": "mysticism",
+      "boost": 4,
+      "examples": ["Visions", "Transcendence", "Mystical Union", "Divine Encounters", "Spiritual Revelation", "Prophetic Dreams", "Out-of-Body Experiences", "Celestial Journeys", "Sacred Communion", "Enlightened States", "Astral Projection", "Soul Merging", "Epiphanies", "Angelic Visitations", "Higher Realms", "Mystical Experiences", "Inner Illumination", "Channeled Messages", "Holy Apparitions", "Sacred Visions", "Ecstatic Trance", "Kundalini Awakening", "Shamanic Journeys", "Divine Inspiration"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Self-Reflection",
+      "tag": "self_reflection",
+      "boost": 2,
+      "examples": ["Journaling", "Introspection", "Personal Growth", "Life Purpose", "Self-Reflection", "Meditation", "Goal Setting", "Mind Mapping", "Vision Boarding", "Gratitude Practice", "Self-Discovery", "Mindfulness Practices", "Emotional Healing", "Values Clarification", "Spiritual Exploration", "Daily Affirmations", "Habit Tracking", "Inner Work", "Therapeutic Writing", "Mentorship", "Coaching Sessions", "Life Review", "Mindful Living", "Purposeful Living"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Inner Peace",
+      "tag": "inner_peace",
+      "boost": 3,
+      "examples": ["Tranquility", "Harmony", "Contentment", "Equanimity", "Peacefulness", "Balance", "Serenity", "Stillness", "Calmness", "Inner Peace", "Acceptance", "Composure", "Mindfulness", "Centeredness", "Ease", "Stability", "Grace", "Poise", "Gentleness", "Unity", "Relaxation", "Bliss", "Simplicity", "Resilience"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Universal Truths",
+      "tag": "universal_truths",
+      "boost": 2,
+      "examples": ["Impermanence", "Interconnectedness", "Duality", "Unity", "Non-Attachment", "Oneness", "Cyclical Nature", "Paradox", "Balance", "Cause and Effect", "Emptiness", "Wholeness", "Opposites", "Universal Flow", "Harmony in Opposites", "Cosmic Order", "Singularity", "Eternal Return", "Yin and Yang", "The Middle Way", "Unity in Diversity", "Change", "Continuity", "Universal Truths"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Nature & Spirituality",
+      "tag": "nature_spirituality",
+      "boost": 7,
+      "examples": ["Gaia Theory", "Stone Circles", "Sacred Groves", "Nature Worship", "Earth Rituals", "Ecospirituality", "Animism", "Tree of Life", "Shamanism", "Pagan Festivals", "Herbalism", "Solstice Celebrations", "Forest Bathing", "Land Blessings", "Elemental Reverence", "Nature Deities", "Ritual Offerings", "Spiritual Ecology", "Sacred Mountains", "Water Blessings", "Eco-rituals", "Earth-Centered Spirituality", "Spirit Animals", "Lunar Rituals"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Philosophy of Mind",
+      "tag": "philosophy_of_mind",
+      "boost": 2,
+      "examples": ["Dualism", "Materialism", "Panpsychism", "Consciousness Studies", "Idealism", "Monism", "Phenomenology", "Epiphenomenalism", "Emergentism", "Functionalism", "Physicalism", "Solipsism", "Mind-Body Problem", "Philosophy of Mind", "Qualia", "Cognitive Science", "Behaviorism", "Intentionality", "Mental Causation", "Non-reductive Physicalism", "Holism", "Metaphysics", "Substance Dualism", "Property Dualism"],
+      "type": "esoteric"
+    },
+    {
+      "name": "Ambition",
+      "tag": "ambition",
+      "boost": 3,
+      "examples": ["Career Success", "Power", "Fame", "Achievement", "Wealth", "Recognition", "Influence", "Ambition", "Status", "Authority", "Leadership", "Promotion", "Legacy", "Accomplishment", "Reputation", "Advancement", "Professional Growth", "Prestige", "Influence", "Self-Actualization", "Entrepreneurship", "High Performance", "Competence", "Mastery"],
+      "type": "humanity"
+    },
+    {
+      "name": "Greed",
+      "tag": "greed",
+      "boost": 1,
+      "examples": ["Wealth Hoarding", "Materialism", "Exploitation", "Avarice", "Greed", "Selfishness", "Consumerism", "Corruption", "Overindulgence", "Monopolization", "Manipulation", "Possessiveness", "Covetousness", "Obsession with Wealth", "Economic Inequality", "Profiteering", "Excessive Ambition", "Resource Hoarding", "Financial Control", "Unethical Practices", "Lust for Power", "Corporate Greed", "Environmental Degradation", "Social Injustice"],
+      "type": "humanity"
+    },
+    {
+      "name": "Love & Affection",
+      "tag": "love_affection",
+      "boost": 3,
+      "examples": ["Romantic Love", "Family Bonds", "Friendship", "Companionship", "Passion", "Parent-Child Relationship", "Loyalty", "Intimacy", "Brotherhood", "Sisterhood", "Mutual Respect", "Platonic Love", "Emotional Support", "Unconditional Love", "Marriage", "Partnership", "Soulmates", "Affection", "Trust", "Camaraderie", "Caregiving", "Commitment", "Shared Experiences", "Kindness"],
+      "type": "humanity"
+    },
+    {
+      "name": "Lust",
+      "tag": "lust",
+      "boost": 1,
+      "examples": ["Physical Desire", "Sensuality", "Infatuation", "Obsession", "Lust", "Temptation", "Eroticism", "Passionate Attraction", "Jealousy", "Unrequited Love", "Desire", "Yearning", "Addiction", "Possessiveness", "Impulsiveness", "Intense Craving", "Forbidden Love", "Allure", "Seduction", "Fetishism", "Emotional Intensity", "Romantic Fantasy", "Overindulgence", "Compulsion"],
+      "type": "humanity"
+    },
+    {
+      "name": "Gluttony",
+      "tag": "gluttony",
+      "boost": 1,
+      "examples": ["Overeating", "Excessive Consumption", "Indulgence", "Craving", "Binge Eating", "Addiction", "Gluttony", "Overindulgence", "Compulsive Eating", "Hoarding", "Greediness", "Obesity", "Lack of Restraint", "Food Obsession", "Self-Gratification", "Impulse Control Issues", "Food Addiction", "Mindless Eating", "Emotional Eating", "Satisfaction Seeking", "Overabundance", "Lust for Excess", "Unhealthy Habits", "Excessive Pleasure Seeking"],
+      "type": "humanity"
+    },
+    {
+      "name": "Pride",
+      "tag": "pride",
+      "boost": 1,
+      "examples": ["Vanity", "Arrogance", "Self-Importance", "Narcissism", "Conceit", "Egoism", "Pride", "Self-obsession", "Superiority Complex", "Boastfulness", "Self-admiration", "Hubris", "Self-centeredness", "Grandiosity", "Smugness", "Entitlement", "Inflated Ego", "Pretentiousness", "Self-glorification", "Attention Seeking", "Self-delusion", "Vainglory", "Egocentrism", "Self-righteousness"],
+      "type": "humanity"
+    },
+    {
+      "name": "Jealousy",
+      "tag": "jealousy",
+      "boost": 1,
+      "examples": ["Envy", "Rivalry", "Possessiveness", "Suspicion", "Jealousy", "Resentment", "Covetousness", "Distrust", "Insecurity", "Bitterness", "Grudge", "Competition", "Paranoia", "Greed", "Hostility", "Comparison", "Mistrust", "Fear of Loss", "Malice", "Vindictiveness", "Inferiority Complex", "Obsession with Others", "Territoriality", "Fear of Betrayal"],
+      "type": "humanity"
+    },
+    {
+      "name": "Generosity",
+      "tag": "generosity",
+      "boost": 3,
+      "examples": ["Charity", "Altruism", "Kindness", "Giving", "Compassion", "Generosity", "Philanthropy", "Benevolence", "Empathy", "Selflessness", "Volunteerism", "Humanitarianism", "Service", "Support", "Forgiveness", "Community Service", "Sharing", "Caring", "Goodwill", "Mutual Aid", "Acts of Kindness", "Helping Others", "Generous Spirit", "Social Responsibility"],
+      "type": "humanity"
+    },
+    {
+      "name": "Compassion",
+      "tag": "compassion",
+      "boost": 3,
+      "examples": ["Empathy", "Sympathy", "Understanding", "Mercy", "Kindness", "Forgiveness", "Tolerance", "Patience", "Gentleness", "Consideration", "Sensitivity", "Benevolence", "Supportiveness", "Warmth", "Leniency", "Humaneness", "Generosity of Spirit", "Care", "Non-judgment", "Acceptance", "Grace", "Mindfulness", "Emotional Intelligence"],
+      "type": "humanity"
+    },
+    {
+      "name": "Wrath",
+      "tag": "wrath",
+      "boost": 4,
+      "examples": ["Anger", "Vengeance", "Rage", "Aggression", "Hatred", "Resentment", "Hostility", "Bitterness", "Fury", "Wrath", "Vindictiveness", "Violence", "Grudge", "Retaliation", "Irritation", "Outburst", "Malice", "Spite", "Temper", "Revenge", "Rancor", "Frustration", "Impatience", "Belligerence"],
+      "type": "humanity"
+    },
+    {
+      "name": "Forgiveness",
+      "tag": "forgiveness",
+      "boost": 4,
+      "examples": ["Letting Go", "Tranquility", "Reconciliation", "Mercy", "Pardon", "Forgiveness", "Healing", "Peace-making", "Amnesty", "Understanding", "Acceptance", "Clemency", "Redemption", "Release", "Restoration", "Harmony", "Compassion", "Closure", "Renewal", "Grace", "Second Chances", "Toleration", "Moving Forward", "Mending Fences"],
+      "type": "humanity"
+    },
+    {
+      "name": "Greed for Power",
+      "tag": "power_greed",
+      "boost": 2,
+      "examples": ["Dominance", "Control", "Manipulation", "Authoritarianism", "Oppression", "Tyranny", "Coercion", "Subjugation", "Exploitation", "Command", "Power Over Others", "Dictatorship", "Totalitarianism", "Intimidation", "Supremacy", "Forcefulness", "Bullying", "Hegemony", "Despotism", "Repression", "Rigid Hierarchy", "Centralization of Power", "Enforcement", "Imposition"],
+      "type": "humanity"
+    },
+    {
+      "name": "Security & Stability",
+      "tag": "security_stability",
+      "boost": 3,
+      "examples": ["Safety", "Comfort", "Predictability", "Home", "Security", "Stability", "Familiarity", "Shelter", "Warmth", "Peace", "Routine", "Belonging", "Protection", "Cozy", "Reliability", "Tranquility", "Support", "Nest", "Sanctuary", "Contentment", "Reassurance", "Homeliness", "Solace", "Grounding"],
+      "type": "humanity"
+    },
+    {
+      "name": "Addiction",
+      "tag": "addiction",
+      "boost": 3,
+      "examples": ["Substance Abuse", "Compulsive Behavior", "Dependency", "Craving", "Addiction", "Withdrawal", "Obsession", "Overindulgence", "Habitual Use", "Relapse", "Tolerance", "Self-Destruction", "Loss of Control", "Need for Escape", "Reckless Behavior", "Impulse Control Issues", "Physical Dependence", "Mental Health Struggles", "Desperation", "Escalation", "Unhealthy Coping Mechanisms", "Isolation", "Self-Medication", "Despair"],
+      "type": "humanity"
+    },
+    {
+      "name": "Enlightenment & Wisdom",
+      "tag": "enlightenment_wisdom",
+      "boost": 3,
+      "examples": ["Knowledge", "Spiritual Insight", "Clarity", "Truth", "Wisdom", "Enlightenment", "Awareness", "Understanding", "Discernment", "Illumination", "Revelation", "Perception", "Intuition", "Profound Insight", "Self-Knowledge", "Inner Knowing", "Divine Understanding", "Awakening", "Epiphany", "Certainty", "Reality", "Deep Comprehension", "Pure Awareness", "Universal Knowledge"],
+      "type": "humanity"
+    },
+    {
+      "name": "Sloth",
+      "tag": "sloth",
+      "boost": 1,
+      "examples": ["Laziness", "Procrastination", "Apathy", "Inactivity", "Sloth", "Indifference", "Idleness", "Passivity", "Lethargy", "Neglect", "Lack of Motivation", "Complacency", "Disengagement", "Unproductiveness", "Stagnation", "Disinterest", "Lack of Initiative", "Avoidance", "Delay", "Torpor", "Inertia", "Languor", "Dawdling", "Listlessness"],
+      "type": "humanity"
+    },
+    {
+      "name": "Freedom",
+      "tag": "freedom",
+      "boost": 5,
+      "examples": ["Empowerment", "Sovereignty", "Independence", "Autonomy", "Liberation", "Self-Determination", "Freedom", "Self-Reliance", "Individuality", "Emancipation", "Free Will", "Self-Sufficiency", "Unconstrained", "Liberty", "Self-Governance", "Personal Agency", "Choice", "Nonconformity", "Unrestricted", "Decisiveness", "Self-Expression", "Volition", "Breakaway", "Self-Ownership"],
+      "type": "humanity"
+    },
+    {
+      "name": "Vanity",
+      "tag": "vanity",
+      "boost": 1,
+      "examples": ["Self-Admiration", "Superficiality", "Appearance", "Ego", "Narcissism", "Vanity", "Self-Obsessed", "Materialism", "Conceit", "Pride", "Shallowness", "Self-Centeredness", "Image-Consciousness", "Arrogance", "Pretentiousness", "Self-Importance", "Vain", "Status-Seeking", "Self-Image", "External Validation", "Egotism", "Face-Value", "Self-Glorification", "Appearance-Driven"],
+      "type": "humanity"
+    },
+    {
+      "name": "Redemption",
+      "tag": "redemption",
+      "boost": 1,
+      "examples": ["Atonement", "Repentance", "Forgiveness", "Moral Recovery", "Redemption", "Reconciliation", "Healing", "Penance", "Amends", "Renewal", "Restitution", "Self-Forgiveness", "Spiritual Cleansing", "Moral Rebirth", "Making Amends", "Grace", "Purification", "Contrition", "Moral Restoration", "Regret", "Confession", "Mending Relationships", "Transformation", "Spiritual Renewal"],
+      "type": "humanity"
+    }
+  ]
+}

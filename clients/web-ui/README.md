@@ -6,7 +6,9 @@ This project is a web-based front-end for the `mflux-server` image generation se
 
 ## Features
 
-- **Multi-Image Generation**: Generate multiple images in a single request, allowing for efficient batch image creation.
+- **Multi-Image Generation**: Generate several outputs through sequential requests using the Count control.
+- **Image Inputs**: The compact **+ Images** button adds files below the prompt. A numbered filename list offers small reorder arrows, individual × buttons, and Clear. Each request sends an ordered `init_images` array for one output.
+- **Model Support**: `/api/info` controls whether adding images is enabled and how many may be attached. Uploads are disabled while support is unknown, for models without image input, and at the limit. Model/server changes and window focus refresh capabilities; submission checks again. If a model switch makes existing attachments invalid, remove them before generating. FLUX.2 Klein supports up to four references; Qwen Image 2.1 accepts up to ten ordered references. Mention “image 1”, “image 2”, etc. in the prompt using the numbered attachment list. Restart an older server to expose the updated limit.
 - **Convenient Image Download**: Each generated image includes a dedicated download button, making it easy to save images to your local system.
 - **Collision-Free Naming**: Images are saved with unique, timestamped filenames to prevent filename collisions, enabling smooth handling of large image sets.
 

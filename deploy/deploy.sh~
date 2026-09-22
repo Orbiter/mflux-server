@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 # Change to the directory where the script is located
 cd "$(dirname "$0")"
@@ -32,14 +31,8 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-# Forward server options (for example --model qwen-image-2.1 --quantize 8).
-# plistlib handles XML escaping and keeps each argument separate.
-PROJECT_PYTHON="$(dirname "$RUNSCRIPT")/.venv/bin/python3.12"
-if [[ ! -x "$PROJECT_PYTHON" ]]; then
-    PROJECT_PYTHON="python3.12"
-fi
-"$PROJECT_PYTHON" render_plist.py --username "$USERNAME" --runscript "$RUNSCRIPT" \
-    --output "$DEST_FILE" -- "$@"
+# Use sed for macOS-compatible substitutions
+sed -e "s|\\\$USERNAME\\\$|$USERNAME|g" -e "s|\\\$RUNSCRIPT\\\$|$RUNSCRIPT|g" "$TEMPLATE_FILE" > "$DEST_FILE"
 
 # Set the correct permissions for the destination file
 chmod 644 "$DEST_FILE"
@@ -67,6 +60,7 @@ fi
 
 # Step 5: Logging Information
 echo "Service logs will be available at:"
-echo "  /tmp/de.anomic.mflux-server.log"
+echo "  Standard Output: /tmp/de.anomic.mflux-server.out.log"
+echo "  Standard Error: /tmp/de.anomic.mflux-server.err.log"
 
 echo "Deployment completed successfully."
