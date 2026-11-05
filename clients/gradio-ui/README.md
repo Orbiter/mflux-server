@@ -11,11 +11,15 @@ This project is a Python-based front-end for the `mflux-server` image generation
 - **Customizable Server Endpoint**: Specify a custom server endpoint when launching the application if `mflux-server` is hosted on a different server or port.
 - **Compact Image Attachments**: Add files with **+ Images**. Filenames appear as small chips beside the button; use each chip's × to remove it, or clear the selection. Images are sent together in the displayed order in the `init_images` array for one output.
 - **Model Capabilities**: `/api/info` enables uploads only when the current model supports them, up to its limit. Capabilities refresh on page load, every ten seconds, with Refresh, and before submission. Attachments remain removable if the model changes; excess inputs block generation. If capability lookup fails, adding images is disabled.
+- **Model Loading**: Choose a registered family, optional local/HF source, quantization, LoRAs and scales. Supported models also offer smaller encoders/decoders and float16 compute.
+- **Advanced Editing**: Optional negative prompts, guidance, sampler, masks, depth/control inputs, edit strength, enhancement, verification and step reuse are forwarded where supported. Leave Steps blank for the model default, including Iris Base's 100 steps.
+- **Recipes**: The server recipe appears as a downloadable JSON file after generation, including for JPEG output. PNG output also embeds it.
+- **Model-specific Controls**: Refresh or load a model to update supported samplers, masks, generation options and output defaults. Selecting a family updates its component/adapter controls and quantization choices.
 
 ## Installation
 
 1. Clone this repository and navigate to the project directory.
-2. Create a virtual environment and activate it:
+2. Create a separate client virtual environment and activate it (do not reuse the server `.venv`; current Gradio requires Pillow below 13 while mflux requires Pillow 13):
    ```bash
    python3.12 -m venv venv
    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
@@ -44,7 +48,7 @@ python3.12 clients/gradio-ui/mflux-gradio-ui.py --server http://custom-server:po
 ## Usage
 
 Qwen Image 2.1 accepts up to ten ordered reference attachments; FLUX.2 Klein
-accepts four. The limit and counter come from `/api/info`. Restart an older
+accepts four, FLUX 3 ten, FIBO 2 five and Qwen Edit 2511 three. The limit and counter come from `/api/info`. Restart an older
 server after updating, then refresh the model capabilities in the client.
 - Open http://127.0.0.1:7860 in your browser.
 - Enter a prompt and configure the parameters in the Gradio interface.

@@ -48,6 +48,15 @@ class Qwen21ContextCache:
     def clear(self):
         self.entries.clear()
 
+    @property
+    def time_text_embed(self):
+        """mflux 0.24 uses this native signal even when step reuse is disabled."""
+        return self.transformer.time_text_embed
+
+    def inference_projections(self):
+        """Preserve upstream's request-local projection preparation and cleanup."""
+        return self.transformer.inference_projections()
+
     def __call__(self, t, config, hidden_states, encoder_hidden_states, encoder_hidden_states_mask=None):
         text = encoder_hidden_states
         mask = encoder_hidden_states_mask

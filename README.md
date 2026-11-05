@@ -4,7 +4,7 @@ This API server is designed for asynchronous image generation tasks with [mflux]
 
 ## Supported models at a glance
 
-**Default: FLUX.2 Klein 4B — ungated, 4 inference steps.** Start it with
+**Default: FLUX 3 Image Klein — 16 inference steps.** Start it with
 `./run.sh`, or choose any model below with `./run.sh --model NAME`.
 The startup parameter also works with `.venv/bin/python3.12 server.py`.
 This table covers every checkpoint registered by this server; additional
@@ -12,8 +12,10 @@ accepted names for the same checkpoints are listed just below it.
 
 | Model / checkpoint | Startup parameter | Parameters¹ | Gated² | Default steps³ | Fast, few-step model⁴ |
 | --- | --- | ---: | :---: | ---: | :---: |
-| **[FLUX.2 Klein 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) (default)** | `--model flux2-klein-4b` | 4B | No | **4** | **Yes** |
+| **[FLUX 3 Image Klein](https://huggingface.co/black-forest-labs/flux-3-image-klein) (default)** | `--model flux-3-image-klein` | 5.6B | Yes | **16** | No |
+| [FLUX.2 Klein 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) | `--model flux2-klein-4b` | 4B | No | **4** | **Yes** |
 | [FLUX.2 Klein 9B](https://huggingface.co/black-forest-labs/FLUX.2-klein-9B) | `--model flux2-klein-9b` | 9B | Yes | **4** | **Yes** |
+| [FIBO 2 Edit Turbo](https://huggingface.co/briaai/Fibo-2.0-edit-turbo) | `--model fibo2-edit-turbo` | 8.1B | Yes | **4** | **Yes** |
 | [FLUX.1 Schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell) | `--model schnell` | 12B | Yes | **4** | **Yes** |
 | [FLUX.1 Schnell, 4-bit](https://huggingface.co/dhairyashil/FLUX.1-schnell-mflux-v0.6.2-4bit) | `--model dhairyashil/FLUX.1-schnell-mflux-v0.6.2-4bit` | 12B | No | **4** | **Yes** |
 | [Krea 2 Turbo](https://huggingface.co/krea/Krea-2-Turbo) | `--model krea2` | ~12B | Yes | **8** | **Yes** |
@@ -32,6 +34,20 @@ accepted names for the same checkpoints are listed just below it.
 | [FIBO, 8-bit](https://huggingface.co/briaai/Fibo-mlx-8bit) | `--model briaai/Fibo-mlx-8bit` | 8B | No | 25 | No |
 | [Qwen-Image 2.1](https://huggingface.co/Qwen/Qwen-Image-2.1) | `--model qwen-image-2.1` | 7B | No | 40 | No |
 | [ERNIE-Image](https://huggingface.co/baidu/ERNIE-Image) | `--model ernie-image` | 8B | No | 50 | No |
+| [FLUX 3 Image Klein Base](https://huggingface.co/black-forest-labs/flux-3-image-klein-base) | `--model flux3-image-klein-base` | 5.6B | Yes | 50 | No |
+| [FIBO 2 Dev](https://huggingface.co/briaai/Fibo-2.0-dev) | `--model fibo2` | 8.1B | Yes | 50 | No |
+| [MOSS-Image SFT](https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT) | `--model moss-image` | 4.9B | No | 50 | No |
+| [MOSS-Image Base](https://huggingface.co/OpenMOSS-Team/MOSS-Image-Base) | `--model moss-image-base` | 4.9B | No | 50 | No |
+| [Anima Turbo](https://huggingface.co/circlestone-labs/Anima) | `--model anima` | 2B | See page | 10 | Yes |
+| Anima Aesthetic / Base | `--model anima-aesthetic` / `anima-base` | 2B | See page | 30 | No |
+| [Iris-3B Turbo](https://huggingface.co/speridlabs/iris-3b) | `--model iris-3b` | 3B | See page | 4 (fixed) | Yes |
+| Iris-3B Base | `--model iris-3b-base` | 3B | See page | 100 | No |
+| [Ming-Image Design](https://huggingface.co/inclusionAI/Ming-Image-0.1-Design) | `--model ming-image-design` | 6.15B | See page | 12 | No |
+| [Qwen Image 2.1 Turbo](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo) | `--model qwen-image-2.1-turbo` | 7.1B | See page | 8 | Yes |
+| [Qwen Image Edit 2511](https://huggingface.co/Qwen/Qwen-Image-Edit-2511) | `--model qwen-edit-2511` | 20B | See page | 40 | No |
+| [Qwen 2.1 Fun ControlNet Union](https://huggingface.co/alibaba-pai/Qwen-Image-2.1-Fun-Controlnet-Union) | `--model qwen-image-2.1-controlnet` | 7.1B + control | See page | 40 | No |
+| Qwen 2.1 Turbo + Fun ControlNet Union | `--model qwen-image-2.1-turbo-controlnet` | 7.1B + control | See page | 8 | Yes |
+| [Krea 2 depth ControlNet](https://huggingface.co/Patil/Krea-2-depth-controlnet) | `--model krea2-controlnet` | ~12B + adapter | See page | 8 | Yes |
 
 ¹ **Parameters** are the published, rounded image-generation transformer sizes
 (B = billion), excluding text/vision encoders and the VAE. They are not total
@@ -46,21 +62,24 @@ or `HF_TOKEN`; “No” means the repository allows anonymous downloads. In
 particular, the official FLUX.1 Schnell repository is gated even though its
 listed 4-bit conversion is not. Access status can change and is separate from
 the model's license, which is linked on its model page.
+The FLUX 3 entries were added from the upstream guide on 4 November 2026;
+accept the checkpoint license and authenticate before downloading them.
+FIBO 2 Dev and Edit Turbo's model pages also require acceptance and login,
+checked on 4 November 2026.
+MOSS-Image SFT and Base's model pages are ungated, checked on 4 November 2026.
 
 ³ **Default steps** come from this server's registry, not a generic upstream
 example. Override them per generation using the API's `steps` field or the
 client's steps control. Ideogram 4 instead uses `preset`, defaulting to
 `V4_DEFAULT_20`; its `steps` field does not override the preset.
-With mflux 0.20.0, `qwen` selects Qwen-Image-2512, while the separately listed
+With mflux 0.24.0, `qwen` selects Qwen-Image-2512, while the separately listed
 6-bit repository contains the earlier Qwen-Image checkpoint.
 
 ⁴ **Fast, few-step model** means a model designed to generate in the listed
-4–9 steps. This indicates a low-step speed advantage, not a measured ranking
+4–10 steps. This indicates a low-step speed advantage, not a measured ranking
 across models. Actual latency also depends on model size, resolution, reference
 images, guidance and hardware. The 20–50-step entries are not few-step models,
-even when they benefit from caching. Quantization does not guarantee a speedup;
-see the measured [FLUX.2 performance](docs/flux2-performance.md) and
-[Qwen 2.1 quantization results](docs/qwen21-quantization-performance.md).
+even when they benefit from caching. Quantization does not guarantee a speedup.
 
 ### Additional accepted model names
 
@@ -72,17 +91,32 @@ their corresponding row above. `/api/ls` returns the complete live registry.
 | --- | --- |
 | `flux2-klein-4b` | `black-forest-labs/FLUX.2-klein-4B` |
 | `flux2-klein-9b` | `black-forest-labs/FLUX.2-klein-9B` |
+| `flux-3-image-klein` | `flux3-image-klein`, `flux3-klein`, `flux3`, `black-forest-labs/flux-3-image-klein` |
+| `flux3-image-klein-base` | `flux3-klein-base`, `flux3-base`, `flux-3-image-klein-base`, `black-forest-labs/flux-3-image-klein-base` |
+| `fibo2` | `fibo-2.0-dev`, `briaai/Fibo-2.0-dev` |
+| `fibo2-edit-turbo` | `fibo-2-edit-turbo`, `fibo-2.0-edit-turbo`, `briaai/Fibo-2.0-edit-turbo` |
+| `moss-image` | `moss-image-sft`, `moss`, `OpenMOSS-Team/MOSS-Image-SFT` |
+| `moss-image-base` | `moss-base`, `OpenMOSS-Team/MOSS-Image-Base` |
 | `krea2` | `krea-2`, `krea-2-turbo`, `krea/Krea-2-Turbo` |
 | `ernie-image-turbo` | `baidu/ERNIE-Image-Turbo` |
 | `ernie-image` | `baidu/ERNIE-Image` |
 | `qwen-image-2.1` | `qwen-2.1`, `qwen-image-21`, `Qwen/Qwen-Image-2.1` |
 | `ideogram4` | `ideogram-4-fp8`, `ideogram-ai/ideogram-4-fp8` |
+| `anima` | `anima-turbo`, `circlestone-labs/Anima` |
+| `iris-3b` | `iris-3b-turbo`, `iris-turbo`, `iris`, `speridlabs/iris-3b` |
+| `iris-3b-base` | `iris-base` |
+| `ming-image-design` | `ming-image`, `ming-design`, `ming`, `inclusionAI/Ming-Image-0.1-Design` |
+| `qwen-image-2.1-turbo` | `qwen-2.1-turbo`, `qwen-image-21-turbo`, `qwen-image-turbo-21`, `Qwen/Qwen-Image-2.1-Turbo` |
+| `qwen-edit-2511` | `qwen-image-edit-2511`, `Qwen/Qwen-Image-Edit-2511` |
+| `qwen-image-2.1-controlnet` | `qwen-image-2.1-controlnet-union`, `qwen-2.1-controlnet`, `alibaba-pai/Qwen-Image-2.1-Fun-Controlnet-Union` |
+| `qwen-image-2.1-turbo-controlnet` | `qwen-image-2.1-turbo-controlnet-union`, `qwen-2.1-turbo-controlnet` |
+| `krea2-controlnet` | `krea-2-controlnet-depth`, `krea-2-controlnet`, `Patil/Krea-2-depth-controlnet` |
 
 ## Examples
 
-Here are two different client applications that use the server API. The first one is the default web-frontend which is available at `http://localhost:4030`
+Here are two different client applications that use the server API. The default web frontend, **MFLUX Studio**, is available at `http://localhost:4030`. Its self-contained, classless HTML interface uses dark surfaces, fresh green accents and subtle metal grips. Generation controls sit beside the image gallery on desktop and stack on mobile. Two progress bars track the complete batch and the current image. Each image has paired image/recipe download links; the header's connection control holds the server address and API documentation link.
 
-![Screenshot of mflux Image Generator Web Front-end](clients/web-ui/screenshot.png)
+![MFLUX Studio desktop preview with example images](clients/web-ui/screenshot.png)
 
 The second screenshot shows the Gradio Front-End:
 
@@ -106,7 +140,7 @@ Furthermore, the API exposes a swagger endpoint to self-document the server.
 ## Example usage
 
 Use Python 3.12. The server dependencies in `requirements.txt` pin
-`mflux==0.20.0` and require `mlx>=0.32.2,<0.33.0` and
+`mflux==0.24.0` and require `mlx>=0.32.2,<0.33.0` and
 `protobuf>=4.25.0,<8.0`.
 
 Install the dependencies in a virtual environment:
@@ -125,103 +159,158 @@ the server dependencies. Authentication is separate from starting the server.
 python3.12 server.py --quantize 8 --host 0.0.0.0
 ```
 
-The default model is `flux2-klein-4b`, with 4 inference steps and guidance
+The default model is `flux-3-image-klein`, with 16 inference steps and guidance
 1.0. Select another model with `--model`; `/api/ls` lists supported model names
 and defaults, and `/api/ps` reports the current settings. Without `--host`, the
 server listens on `127.0.0.1`.
 
-FLUX.2 Klein 4B's official weights can be downloaded without Hugging Face
-authentication or access approval. Plain `./run.sh` uses this model with no
-quantization; `--quantize 8` or `--quantize 4` remains optional.
+Plain `./run.sh` uses `flux-3-image-klein` with no
+quantization; `--quantize 4`, `5`, `6` or `8` remains optional where supported (Iris accepts 4/8).
 
 Alternatively, `./run.sh --quantize 8` creates or reuses `.venv`, upgrades the
 dependencies within the requirements constraints, and starts the server on
 `0.0.0.0`. It requires Python 3.12 and does not perform Hugging Face login.
 
-### Qwen Image 2.1
+### Loading options, capabilities and saved checkpoints
 
-Qwen Image 2.1 uses the native `QwenImage21` implementation in the pinned
-`mflux==0.20.0` dependency. For an existing installation, upgrade the virtual
-environment with `.venv/bin/python3.12 -m pip install -r requirements.txt`
-before starting the server.
+`GET /api/info` and each entry of `/api/ls` describe `load_options`,
+`generation_options`, `quantization`, `schedulers`, step limits, fixed steps,
+dimension alignment, RGBA output, masks and control inputs. Explicit unsupported
+options return HTTP 400. The web frontend builds its controls from this data,
+including step limits beyond 50 and model-specific quantization choices.
 
-```sh
-./run.sh --model qwen-image-2.1 --quantize 8
-# Or, after installing requirements:
-.venv/bin/python3.12 server.py --model qwen-image-2.1 --quantize 8 --host 0.0.0.0
+Invalid options return HTTP 400, gated access returns 401, and an unavailable
+Hugging Face repository or pinned revision returns 503 with the upstream error.
+A failed reload keeps the previous loaded model and options. The server does
+not silently switch to an unpinned revision.
+
+Load options belong to the model and require reloading its weights:
+
+```json
+{"model":"flux2-klein-4b","quantize":6,"options":{
+  "small_text_encoder":true,"small_decoder":true,"compute_precision":"float16"
+}}
 ```
 
-Aliases are `qwen-image-2.1`, `qwen-2.1`, `qwen-image-21`, and
-`Qwen/Qwen-Image-2.1`. They work with `--model` and `POST /api/load`
-(`{"model": "qwen-image-2.1", "quantize": 8}`), and appear in `/api/ls` and the
-web frontend. Its inference steps slider reaches 50 and defaults to 40 for
-Qwen Image 2.1. Defaults are **40 steps, guidance 1.0, 1024×1024**. Width and height
-must be positive multiples of 16 and steps must be at least 2; invalid values
-are rejected before queuing.
+Send that object to `POST /api/load`. The same options have startup flags:
+`--small-text-encoder`, `--small-decoder`, `--compute-precision float16`,
+`--vae-full-precision`, `--text-encoder-quantize 5`, `--qwen21-backend legacy`,
+and `--controlnet-path PATH`. Check `/api/info` for which model accepts each.
+`bfloat16` selects native compute; float16 changes only the supported internal
+compute path. Smaller encoders are experimental and can change prompt following.
+`vae_full_precision` uses the full image and requires more memory than the native
+row-strip decode. These are optional settings; the default native paths remain.
+
+Use `--lora PATH` repeatedly and one `--lora-scale NUMBER` per adapter, or
+`options.lora_paths` and `options.lora_scales` arrays. Scales default to 1.
+`--bake-lora` / `--no-bake-lora` (`options.bake_lora`) override the model's
+native policy; MOSS keeps adapters separate by default. Load compatible
+step-distilled LoRAs before using their shorter schedules.
+
+For local models or third-party prequantized repositories, select the family
+explicitly. The stored precision is retained when `quantize` is omitted:
 
 ```sh
-curl http://localhost:4030/api/generate -H 'Content-Type: application/json' \
-  -d '{"prompt":"A small robot reading in a sunlit library","seed":"42","format":"PNG"}'
+./run.sh --model /path/to/flux3-klein-q4 --base-model flux3 --models-dir /path/to/models
 ```
 
-The server supports RGB text-to-image and instruction editing with **up to ten
-ordered reference images** in `init_images`. The legacy base64 `init_image`
-field also uses reference conditioning, starting from fresh noise (no fixed
-img2img strength). Refer to attachments as “image 1”, “image 2”, etc. in your
-prompt. Transparent output and LoRAs are not supported.
-
-mflux 0.20.0 provides the native model components but not the reference-editing
-pipeline. The server connects its Qwen3-VL vision tower and language encoder,
-RGBA VAE inputs, and block-causal transformer attention for this path. Vision
-weights are loaded lazily from the same Qwen checkpoint on the first edit and
-remain resident with the model. No additional inference backend is required.
-References preserve aspect ratio and share a pixel budget of at most 1024×1024
-(or the output area when smaller), divided equally among attachments. They are
-aligned to 32 pixels and are not enlarged except to meet that minimum. This
-bounds reference processing and memory on Metal; many attachments reduce the
-detail retained in each reference. Their order is preserved throughout.
-For optional true classifier-free guidance, pass a nonempty `negative_prompt`
-and `guidance` greater than 1; without both, it performs no negative pass.
-`negative_prompt` is forwarded for Qwen Image 2.1 and Krea 2.
-
-The server enables per-layer **context KV caching** for Qwen Image 2.1 by
-default. The first denoising step records the invariant text keys and values;
-later steps process only the changing image tokens. Native mflux still supplies
-the model components, weights, quantization, scheduler and VAE decoding.
-This does not skip denoising steps or approximate the cached context. Different
-matrix shapes can produce normal floating-point differences, so identical seeds
-are not guaranteed to give bit-identical output to the uncached implementation.
-
-Positive and negative prompts have separate cache entries. For text-to-image,
-the cache is limited to two entries and 512 MiB per request and is released after generation, including
-failed requests. Padded inputs, unsupported batch sizes, and contexts exceeding
-the limit use native execution. Compiled functions are reused across requests,
-but prompt KV tensors are not. Reference editing caches both text and image
-prefixes, with a separate 3 GiB total request limit shared by positive/negative
-branches. Over-budget branches recompute their prefix each step; the same
-`--no-qwen21-context-cache` switch disables reuse. Other models are unaffected. `/api/info` reports
-`context_kv_cache`; it reports whether this optimization is enabled for the
-selected model, not whether every input qualifies. Disable it for A/B comparison:
-
-```sh
-.venv/bin/python3.12 server.py --quantize 8 --no-qwen21-context-cache
+```json
+{"model":"mflux-community/anima-aesthetic-mflux-q4","base_model":"anima-aesthetic"}
 ```
 
-The synchronized Metal benchmark at
-[`benchmarks/benchmark_qwen21_context.py`](benchmarks/benchmark_qwen21_context.py)
-compares native and cached denoising, includes cache prefill in timings, and
-reports numerical error and peak allocated memory. It uses a small synthetic
-model by default; pass `--model-path /path/to/cached/Qwen-Image-2.1/snapshot` to
-load the real transformer locally. It never downloads weights. Inputs remain
-synthetic, and its timings exclude text encoding and VAE decoding.
-The companion `benchmarks/verify_qwen21_context.py` compares actual prompts and
-decoded images. See [Metal measurements and reproduction steps](docs/qwen21-metal-performance.md)
-for performance, numerical differences, memory costs and the MLX guidance used.
+Local directories must pass upstream `mflux-check` package validation before
+loading. `POST /api/check` accepts `model` and optional `base_model` for a
+read-only local/cache check; it never downloads or repairs files. `GET /api/saved`
+lists packages under `--models-dir` or `MFLUX_MODELS_DIR`, also suggested in the
+web frontend's custom-model field. A custom package needs a complete model,
+including the components required by its family.
 
-The initial download is approximately 33 GB even with `--quantize 4` or
-`--quantize 8`. The text encoder stays bf16. MFLUX's Qwen Image 2.1 guide reports
-about 46 GB peak memory unquantized on an M5 Max and recommends q8 when memory
-is tighter; actual usage depends on generation settings.
+### Editing and acceleration controls
+
+`POST /api/generate` accepts optional `mask_image`, `control_image` and
+`depth_image` using the same base64/data-URL encoding as `init_image`.
+Mask images must match the source size; white regenerates and black keeps the
+source. They require one source image and are supported by FIBO 2, native Qwen
+2.1 and Qwen ControlNet. Qwen ControlNet accepts a structural `control_image`
+and per-request `controlnet_strength`; it also inpaints with source + mask.
+Krea depth ControlNet accepts `depth_image`, or one photograph in `init_image`
+to estimate depth with Depth Pro. Krea's `controlnet_strength` is a **load
+option**, because native mflux merges the control deltas before quantization.
+
+Native Qwen 2.1 accepts `strength` in (0,1], `auto_mask` (an object description),
+`enhance_prompt`, `verify`, `verify_retries` (0–10), `output_resolution`,
+`use_kv_cache`, `use_step_cache` and `step_cache_threshold`. Step reuse needs
+the prefix cache. The small text encoder cannot auto-mask, rewrite or verify.
+
+FIBO 2 and MOSS accept `step_cache_ratio` in (0,1); FIBO 2 and Ideogram accept
+`cfg_end` in (0,1]. FIBO also accepts `render_text_images`; MOSS accepts an
+`uncond_skip_layers` integer array, with `[]` disabling the native layer skip.
+Supported sampler choices are listed per model. Approximate acceleration is
+opt-in and can change the image; short runs may skip no steps by upstream design.
+
+### Generation recipes
+
+`GET /api/recipe?task_id=...` returns a versioned JSON recipe containing the
+load configuration, generation options, seed, runtime cache flags, model revision pins and input
+pixel hashes. Retrieve it before `/api/image` deletes the task. PNG files also
+embed it as `mflux_recipe`; the web frontend offers a JSON download.
+Uploaded images are normalized for EXIF orientation before hashing and queuing.
+Replay by loading `recipe.load` through `/api/load` and submitting
+`{"recipe": RECIPE}` to `/api/generate`. Supply the original source/mask/control
+images again; recipes contain hashes rather than image data. A changed model,
+load option or input is rejected. Unknown revision pins are recorded as null;
+local and unpinned third-party files must be kept unchanged for reproducibility.
+Replay requires the same mflux version and runtime cache flags; numerical results
+can still vary with hardware. Effective rewritten prompts are recorded separately.
+All queued requests fail clearly if their loaded model/options change before
+execution. Raw image data is excluded from `/api/tasks` and recipes.
+
+The Python client accepts `--load load.json`, `--options generation.json`,
+`--mask-image FILE`, `--control-image FILE`, `--depth-image FILE`, and
+`--recipe-output recipe.json`. Replay with `--recipe recipe.json` and the
+original input files after loading the recipe's model configuration. Use an
+output extension that matches the recipe's format; generation options can
+explicitly override the format and other recorded parameters.
+
+### Native Qwen Image 2.1 and the new 0.24 models
+
+Qwen Image 2.1 now loads mflux's native `QwenImage21Edit` for text-to-image and
+up to ten ordered reference images. It supports RGBA output, native prefix KV
+caching, quantized text/vision weights, masks, edit strength, automatic masks,
+prompt enhancement and verification. Dimensions must be multiples of **32**;
+steps must be at least two. Its defaults remain 40 steps and guidance 1.0.
+PNG is now the default for Qwen 2.1, Qwen ControlNet and Ming to preserve alpha;
+explicit JPEG requests composite alpha on white.
+
+`qwen-image-2.1-turbo` selects the actual Turbo checkpoint and its native
+8-node schedule, with guidance fixed at 1.0. This is separate from running the
+base checkpoint with a distilled LoRA and `scheduler: "viggle_turbo"` (six steps).
+The legacy custom Qwen adapter remains available for comparisons through
+`--qwen21-backend legacy`; it does not support Turbo, small encoders or advanced
+editing controls. `--no-qwen21-context-cache` disables the selected backend's
+prefix cache. Historical measurements below used the old adapter on mflux 0.20
+and are not performance claims for the native 0.24 path.
+The native editor changes conditioning, decoding and quantization, so the same
+seed can produce a different image from the legacy adapter. The native path
+adds editing features and lowers quantized memory use; it is not uniformly
+faster.
+
+Anima has Turbo (`anima`, 10 steps/guidance 1), Aesthetic and Base (30 steps/
+guidance 4). Iris generates pixels without a VAE: Turbo always uses four steps
+and guidance 1; Base defaults to 100 steps/guidance 3. Ming defaults to 12 steps,
+guidance 1 and RGBA output; `--text-encoder-quantize` controls its encoder
+separately. Qwen Edit 2511 needs one to three references and defaults to 40
+steps/guidance 4. All model aliases and live options are available from `/api/ls`.
+
+Use `--model anima-aesthetic`, `iris-3b`, `iris-3b-base`, `ming-image-design`,
+`qwen-edit-2511`, `qwen-image-2.1-turbo`, `qwen-image-2.1-controlnet`,
+`qwen-image-2.1-turbo-controlnet`, or `krea2-controlnet`. Native mflux aliases
+are accepted too. Iris/Anima/Ming are text-to-image only.
+
+The following quantization measurements describe the **legacy mflux
+0.20 adapter**. It downloaded approximately 33 GB and kept its text encoder in
+bf16. The native 0.24 editor quantizes text/vision components too, so its memory
+and timing behavior differs.
 
 **Measured quantization performance (22 September 2026):** on an Apple M1 Ultra
 with 64 GiB unified memory, **bf16 was fastest in every tested workload**.
@@ -242,32 +331,11 @@ peak allocated MLX memory was **43.02 GiB (bf16), 36.81 GiB (Q8), and
 33.49 GiB (Q4)**. These figures include resident model tensors, but are not
 whole-process memory or minimum RAM requirements.
 
-For speed on this machine, keep the existing **unquantized bf16 default**:
-start `./run.sh` without `--quantize`. Q8 and Q4 provide memory savings here.
-Results may differ on other hardware or under memory pressure; these 12-step
-tests do not replace the recommended 40-step quality setting.
-
-See the [full performance report](docs/qwen21-quantization-performance.md)
-and [raw measurements](docs/qwen21-quantization-results.json) for methodology,
-stage timings and memory results. To reproduce the comparison, use
-[`benchmarks/benchmark_qwen21_quantization.py`](benchmarks/benchmark_qwen21_quantization.py),
-which runs the server's generation adapter in separate processes without
-starting or reconfiguring the server.
-
-For the other supported models, see the [cross-model performance audit](docs/model-performance-audit.md).
-It identifies reusable conditioning stages in Krea 2, Z-Image and FIBO, along
-with shared memory/compilation opportunities and architecture-specific limits
-on KV caching. Krea 2 and FLUX.2 Klein 4B have implementations described below; the other
-families remain proposals and small feasibility probes, not measured full-model speedups.
-
-To configure the macOS launch daemon with this model:
-
-```sh
-sudo ./deploy/deploy.sh --model qwen-image-2.1 --quantize 8
-```
-
-Deployment stores those arguments in the plist and starts/reloads the service.
-See [deployment instructions](deploy/README-deploy.md) for setup and logs.
+In that legacy setup, unquantized bf16 was fastest and Q8/Q4 saved memory.
+The server retains its unquantized default; these older measurements do not
+establish the fastest precision for the native 0.24 editor. Results may differ
+on other hardware or under memory pressure, and these 12-step tests do not
+replace the recommended 40-step quality setting.
 
 ### Image inputs and multi-image editing
 
@@ -285,9 +353,15 @@ img2img; only `multi_image_edit` indicates joint reference conditioning.
 | Model | Maximum inputs | Input behavior |
 | --- | ---: | --- |
 | FLUX.2 Klein 4B / 9B, including repository-name aliases | 4 | Native reference-conditioned editing |
+| FLUX 3 Image Klein / Base, including all aliases | 10 | Native reference-conditioned editing |
+| FIBO 2 Dev / Edit Turbo, including all aliases | 5 | Native reference-conditioned instruction editing |
 | Qwen Image 2.1, including all aliases | 10 | Ordered reference-conditioned instruction editing |
 | Other existing img2img models | 1 | Ordinary img2img, strength 0.4 |
-| Ideogram 4 | 0 | Text-to-image only |
+| Ideogram 4 and MOSS-Image SFT / Base | 0 | Text-to-image only |
+| Anima, Iris-3B and Ming | 0 | Text-to-image only |
+| Qwen Image Edit 2511 | 3 | Requires one to three references |
+| Qwen 2.1 ControlNet | 1 | Source + mask for inpainting; separate optional control image |
+| Krea depth ControlNet | 1 | Photograph for depth estimation, or separate prepared depth map |
 
 FLUX.2 Klein now uses mflux's native `Flux2KleinEdit` adapter for text-to-image
 and reference editing. Single inputs also use reference conditioning, without
@@ -343,7 +417,7 @@ reusing those inputs for each prompt and validating support before submission.
 
 ### FLUX.2 Klein 4B performance
 
-The default model runs native mflux denoising with three server optimizations:
+FLUX.2 Klein 4B runs native mflux denoising with three server optimizations:
 repeated-prompt encoding reuse, reference VAE encoding reuse, and reuse of
 native prediction functions (compiled on supported Apple chips). These are
 enabled for `flux2-klein-4b` and `black-forest-labs/FLUX.2-klein-4B` and listed
@@ -364,14 +438,143 @@ without encoder/predictor caches. Both paths normalize absent reference inputs
 to empty tensors, fixing text-only generation through mflux 0.20's edit adapter.
 
 The largest expected saving is for repeated prompts or reference images.
-Fresh inputs still require their encoders. The reproducible real-model
-comparison is `benchmarks/benchmark_flux2.py`; see the
-[FLUX.2 performance report](docs/flux2-performance.md) for results and commands.
+Fresh inputs still require their encoders.
 On an M1 Ultra at BF16/four steps, repeated-input medians improved by about
 3–8% across the measured 512px/1024px text and two-reference cases. Fresh-input
 inference showed no consistent speedup. All 29 native/optimized comparisons
 produced identical final latents and images. Queue-wakeup savings are additional
 and are not included in these inference measurements.
+
+### MOSS-Image
+
+MOSS-Image uses the native implementation in `mflux==0.24.0`. Start SFT with:
+
+```sh
+./run.sh --model moss-image --quantize 8
+```
+
+Use `--model moss-image-base` for Base. All names in the alias table also work
+with `POST /api/load`, for example `{"model": "moss-image", "quantize": 8}`,
+and appear in `/api/ls` and the web frontend. Quantization is optional; the
+server CLI accepts 4, 5, 6 or 8 bits where supported. Both checkpoints initially download about
+27 GB of weights before optional quantization. The official repositories are
+ungated and use Apache 2.0.
+
+Both variants default to **50 steps, guidance 3.0 and 1024×1024**. The server
+uses the native training-grid schedule and negative-branch layer skip (layer
+22). Width and height must be positive multiples of 16. Steps must produce
+distinct training-grid points: the native scheduler accepts **1–218 steps**.
+Invalid dimensions, step counts or seeds return HTTP 400 before queuing.
+
+Use the existing `/api/generate` → `/api/status` → `/api/image` workflow:
+
+```sh
+curl http://localhost:4030/api/generate -H 'Content-Type: application/json' \
+  -d '{"prompt":"A fluffy cat on a wooden bench in golden evening light","seed":"42","format":"PNG"}'
+```
+
+Natural-language prompts, tag sequences and JSON layouts all pass through
+unchanged; encode a JSON layout as a string in `prompt`. The existing
+`negative_prompt` field is forwarded, defaulting to empty conditioning in
+mflux. The negative branch runs when `guidance` differs from 1.0; setting it
+to 1.0 disables that pass.
+
+Both checkpoints are text-to-image only. `/api/info` reports `edit: false`,
+`multi_image_edit: false` and `max_init_images: 0`; nonempty `init_image` or
+`init_images` inputs return HTTP 400. The clients disable image attachments.
+LoRAs are load options; `step_cache_ratio` and `uncond_skip_layers` are supported generation options. See the
+[MFLUX MOSS-Image guide](https://github.com/mflux-community/mflux/blob/main/src/mflux/models/moss_image/README.md)
+for model details and layout examples.
+
+### FIBO 2
+
+FIBO 2 uses the native implementation in `mflux==0.24.0`. Start Dev with:
+
+```sh
+./run.sh --model fibo2 --quantize 8
+```
+
+Use `--model fibo2-edit-turbo` for the distilled editing checkpoint. All names
+in the alias table also work with `POST /api/load`, for example
+`{"model": "fibo2-edit-turbo", "quantize": 8}`, and appear in `/api/ls` and
+the web frontend. Quantization is optional; the CLI accepts 4, 5, 6 or 8 bits where supported.
+
+Dev defaults to **50 steps and guidance 5.0**. Edit Turbo defaults to
+**4 steps and guidance 1.0**, which disables the negative pass. Following mflux,
+the server also accepts text-to-image requests with Edit Turbo, although Bria
+presents that checkpoint for editing. Both default to **1024×1024**, including
+edits; the server always supplies the output dimensions. Width and height must
+be multiples of 16 between 16 and 8192, steps must be at least 1, and the seed
+must be an integer. Invalid values return HTTP 400 before queuing.
+
+The API's `prompt` remains a string: use plain text or a JSON caption encoded
+as a string. FIBO 2 prompts pass directly to mflux, which handles caption
+formatting and native text rendering. For example:
+
+```sh
+curl http://localhost:4030/api/generate -H 'Content-Type: application/json' \
+  -d '{"prompt":"A snowy owl on a mossy branch in a misty pine forest at dawn","seed":"42","format":"PNG"}'
+```
+
+For editing, provide one to five ordered base64 references in `init_images`,
+or one in the legacy `init_image` field, and write an instruction such as
+`Make the bicycle blue`. Refer to multiple inputs as `<image_1>`, `<image_2>`,
+and so on. JSON edit prompts require an `edit_instruction` string and may
+include a `structured_caption` describing the result. Malformed JSON captions,
+invalid caption field types, and JSON edits without an instruction return
+HTTP 400 before queuing; unknown or missing caption fields remain upstream
+warnings. Native editing conditions fresh noise without an img2img strength.
+`/api/info` reports `edit: true`, `multi_image_edit: true`, and
+`max_init_images: 5` for both checkpoints.
+
+The existing `negative_prompt` field overrides mflux's default negative
+conditioning when `guidance` is greater than 1. Omit it to retain the native
+text-to-image or edit default. At guidance 1 or below, it has no effect.
+FIBO 2 accepts `mask_image`, `step_cache_ratio`, `cfg_end` and `render_text_images`. LoRAs are model-load options. Automatic FIBO-vlm prompt expansion is not part of the generation API.
+
+Accept the terms on the checkpoint's Hugging Face page and run `hf auth login`
+or set `HF_TOKEN` before loading. Each checkpoint initially downloads about
+25.5 GB before optional quantization. See the
+[MFLUX FIBO 2 guide](https://github.com/mflux-community/mflux/blob/main/src/mflux/models/fibo2/README.md)
+for caption formats and editing examples. Retrieve results through the usual
+`/api/status` and `/api/image` workflow.
+
+### FLUX 3 Image Klein
+
+FLUX 3 uses the native implementation in `mflux==0.24.0`. Update an existing
+environment with `.venv/bin/python3.12 -m pip install -r requirements.txt`, then
+start the distilled checkpoint with:
+
+```sh
+./run.sh --model flux3 --quantize 8
+```
+
+Use `--model flux3-base` for the undistilled Base checkpoint. All names in the
+alias table work with `POST /api/load`, for example
+`{"model": "flux3", "quantize": 8}`, and appear in `/api/ls` and the web
+frontend's model selector. Quantization is optional; the CLI accepts 4, 5, 6 or 8
+bits and otherwise keeps the native weights.
+
+The distilled checkpoint defaults to **16 steps** and ignores `guidance`.
+Base defaults to **50 steps and guidance 3.5**, using two transformer passes
+per step. Both default to **1024×1024**; the server always supplies its output
+dimensions, including for edits. Width and height must be positive multiples
+of 16, steps must be at least 1, and the seed must be an integer. Nonempty
+`negative_prompt` values are unsupported and return HTTP 400 before queuing.
+
+Use the normal `/api/generate` → `/api/status` → `/api/image` workflow for
+text-to-image. For editing or composition, provide one to ten ordered base64
+references in `init_images`, or one reference in the legacy `init_image` field.
+The server reuses the loaded weights for both native generation paths.
+References condition fresh noise without an img2img strength. `/api/info`
+reports `edit: true`, `multi_image_edit: true`, and `max_init_images: 10` for
+both checkpoints. For edits, write a full caption of the intended result.
+
+Before the first download, accept the license on the checkpoint's Hugging Face
+page and run `hf auth login` or set `HF_TOKEN`. Each checkpoint downloads about
+20 GB before optional quantization. See the
+[MFLUX FLUX 3 guide](https://github.com/mflux-community/mflux/blob/main/src/mflux/models/flux3/README.md)
+for model details and prompt examples. LoRAs are model-load options; automatic prompt upsampling is not exposed.
 
 ### Krea 2 Turbo
 
@@ -413,10 +616,8 @@ the Qwen quantization timings above do not establish the fastest Krea precision.
 For classifier-free guidance, use `guidance` greater than 1 and optionally
 `negative_prompt`; this requires a second transformer pass per step.
 
-See the [Krea performance report](docs/krea2-performance.md) for correctness
-checks and reproducible native-versus-optimized benchmarks. A reduced random
-transformer took 16–24% less time on this M1 Ultra; **these are not real Krea
-image-generation speedups**. Full-checkpoint benchmarking is pending because
+A reduced random transformer took 16–24% less time on this M1 Ultra;
+**these are not real Krea image-generation speedups**. Full-checkpoint benchmarking is pending because
 the gated Hugging Face download returned HTTP 401 in this environment.
 
 The first load downloads the Krea weights (about 33 GB, including the text encoder
@@ -427,7 +628,7 @@ download with another loader. There is no need to delete the cache.
 
 ### Ideogram 4
 
-Ideogram 4 is supported by the pinned `mflux==0.20.0` dependency. Start it with
+Ideogram 4 is supported by the pinned `mflux==0.24.0` dependency. Start it with
 `--model ideogram4`, `--model ideogram-4-fp8`, or
 `--model ideogram-ai/ideogram-4-fp8`:
 
@@ -505,7 +706,7 @@ To see the swagger documentation, open `http://localhost:4030/swagger`
 To produce an image, the usual workflow is:
 
 - `/api/generate` to initialize the generation, this returns a `task_id`
-- `/api/status` to poll for `waiting`, `done`, or `error`; waiting tasks include an estimated remaining time
+- `/api/status` to poll for `waiting`, `done`, or `error`; waiting tasks include an estimated remaining time and a progress snapshot
 - `/api/image` to retrieve the produced image as soon as the status turns to "done"
 
 In detail - here is a call to generate an image:
@@ -534,9 +735,9 @@ task with the default model and `--quantize 8` is:
 ```json
 {
   "task_id": "1fc9cc4f",
-  "task_length": 1,
+  "task_length": 0,
   "expected_time_seconds": 120.0,
-  "model": "flux2-klein-4b",
+  "model": "flux-3-image-klein",
   "quantize": 8
 }
 ```
@@ -555,16 +756,61 @@ An example response is:
 {
   "pos": 0,
   "status": "waiting",
-  "wait_remaining": 15
+  "wait_remaining": 15,
+  "progress": {
+    "phase": "sampling",
+    "step": 8,
+    "total_steps": 16,
+    "fraction": 0.475,
+    "attempt": 1,
+    "sampling_fraction": 0.5,
+    "elapsed_seconds": 12.0,
+    "remaining_seconds": 12.0,
+    "iterations_per_second": 0.6666666667,
+    "seconds_per_step": 1.5,
+    "sampling_stats": "50% · 8/16 [00:12<00:12,  1.50s/it]"
+  }
 }
 ```
 The image is expected to be ready in 15 seconds. Position 0 means that no other
 pending task precedes it. Completed and failed tasks do not count toward the
 position or estimated waiting time.
 
-If generation fails, `/api/status` returns HTTP 200 with
-`{"status": "error", "error": "..."}`. Stop polling that task and display the
-error. Failed tasks are not retried and do not delay subsequent tasks; they can
+`progress.phase` is `queued`, `preparing`, `sampling`, `finishing`, `done`, or
+`error`. `step` and `total_steps` describe the actual sampling pass, including
+shorter image-to-image loops. Native progress reporting supplies a `fraction` from 0 to
+0.95 while sampling; decoding, verification and encoding finish the task.
+Only a ready image has fraction 1. Unknown work has a null fraction, including
+preparation, models without callback reporting and additional verification
+passes (`attempt` increases for those passes). This fraction measures completed
+work stages rather than elapsed time.
+
+`sampling_fraction` is the native log's sampling percentage as a value from 0 to
+1. `elapsed_seconds`, `remaining_seconds`, `iterations_per_second` and
+`seconds_per_step` come from the same progress display and smoothed rate as the
+console; `remaining_seconds` is an estimate. `sampling_stats` formats the
+percentage, completed/total steps, elapsed/remaining time and `s/it` or `it/s`
+using the native log formatter. These fields are null until available.
+Counters update when the native log updates, after completed sampling work,
+without extra GPU synchronization. Models that disable the native display fall
+back to callback counts and elapsed time. Sampling values reset for each pass
+and remain at their final values during decoding and encoding; they exclude
+those finishing stages.
+
+The web frontend combines completed images with the current image's partial
+progress for its batch bar, which reaches 100% only after retrieving all images.
+The current-image bar matches the native sampling percentage and shows
+`sampling_stats`, for example `50% · 8/16 [00:12<00:12,  1.50s/it]`. It reaches
+100% when sampling ends, then shows the finishing/saving state while retaining
+the sampling time. Unknown stages and older servers use an indeterminate bar;
+older servers with step reporting retain their step-based display. One batch
+runs at a time per page; errors leave the batch incomplete and unlock its
+controls. Restart an existing server and refresh the page after updating to
+enable the sampling counters and timing.
+
+If generation fails, `/api/status` returns HTTP 200 with `status: "error"`, an
+`error` message and `progress.phase: "error"`. Stop polling that task and display
+the error. Failed tasks are not retried and do not delay subsequent tasks; they can
 be removed with `GET /api/cancel?task_id=...` or `GET /api/clear` (all tasks).
 Generation and image encoding exceptions mark the task as failed; cleanup
 exceptions are logged without changing a successfully generated result.
@@ -654,20 +900,17 @@ def generate_image(mfluxendpoint, prompt, width=1280, height=720, steps=None):
     return image
 ```
 
-## Development checks
+## Dependency check
 
-Run the tests with the project virtual environment:
+Check the installed server dependencies in the project virtual environment:
 
 ```sh
 .venv/bin/python3.12 -m pip check
-.venv/bin/python3.12 -m unittest discover -s tests -v
 ```
 
-The tests mock full model loading and inference, and check small MLX tensor
-operations. They do not download model weights.
-Importing `server.py` still initializes MLX, so the test environment needs an
-accessible GPU backend. On macOS, a sandbox without Metal access cannot run
-the full suite directly.
+Install the Gradio client in its own Python 3.12 environment: current Gradio
+requires Pillow below 13 while mflux 0.24 requires Pillow 13. Do not install
+client requirements into the server venv.
 
 ## License
 

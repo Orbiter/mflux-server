@@ -32,7 +32,9 @@ def get_bytes(url):
         return resp.read()
 
 
-def generate_one_image(base_url, prompt, out_path="output.jpg", *, init_images=None, steps=None, seed=None):
+def generate_one_image(base_url, prompt, out_path="output.jpg", *, init_images=None, steps=None, seed=None,
+                       generation_options=None, mask_image=None, control_image=None, depth_image=None,
+                       recipe=None, recipe_output=None):
     base_url = base_url.rstrip('/')
     payload = {
         "prompt": prompt,
@@ -42,6 +44,18 @@ def generate_one_image(base_url, prompt, out_path="output.jpg", *, init_images=N
         "quality": 85,
         "priority": False,
     }
+    if generation_options:
+        if not isinstance(generation_options, dict):
+            raise ValueError('generation_options must be an object.')
+        protected = {'prompt', 'init_image', 'init_images', 'mask_image', 'control_image', 'depth_image', 'recipe'}
+        if protected & set(generation_options):
+            raise ValueError('Pass prompt and image inputs through their named arguments.')
+        payload.update(generation_options)
+    if recipe is not None:
+        payload = {'recipe': recipe, **(generation_options or {})}
+    for field, filename in (('mask_image', mask_image), ('control_image', control_image), ('depth_image', depth_image)):
+        if filename:
+            payload[field] = base64.b64encode(Path(filename).read_bytes()).decode('ascii')
     if steps is not None:
         payload['steps'] = steps
     if seed is not None:
@@ -71,6 +85,9 @@ def generate_one_image(base_url, prompt, out_path="output.jpg", *, init_images=N
             wait_seconds = 1
         time.sleep(min(wait_seconds, 5))
 
+    if recipe_output:
+        recorded = get_json(base_url + '/api/recipe?task_id=' + urllib.parse.quote(task_id))
+        Path(recipe_output).write_text(json.dumps(recorded, ensure_ascii=False, indent=2) + '\n')
     image_bytes = get_bytes(
         base_url
         + "/api/image?task_id="
@@ -90,7 +107,20 @@ if __name__ == "__main__":
     parser.add_argument('--init-images', nargs='+', metavar='FILE', help='Reference files in prompt order')
     parser.add_argument('--steps', type=int, help='Omit to use the model default')
     parser.add_argument('--seed')
+    parser.add_argument('--options', type=Path, help='JSON file of generation options')
+    parser.add_argument('--mask-image', type=Path)
+    parser.add_argument('--control-image', type=Path)
+    parser.add_argument('--depth-image', type=Path)
+    parser.add_argument('--recipe', type=Path, help='Replay a saved recipe; its model must already be loaded')
+    parser.add_argument('--recipe-output', type=Path, help='Save recipe before the image task is deleted')
+    parser.add_argument('--load', type=Path, help='JSON file to POST to /api/load before generating')
     args = parser.parse_args()
+    if args.load:
+        post_json(args.server.rstrip('/') + '/api/load', json.loads(args.load.read_text()))
     path = generate_one_image(args.server, args.prompt, args.output,
-                              init_images=args.init_images, steps=args.steps, seed=args.seed)
+                              init_images=args.init_images, steps=args.steps, seed=args.seed,
+                              generation_options=json.loads(args.options.read_text()) if args.options else None,
+                              mask_image=args.mask_image, control_image=args.control_image, depth_image=args.depth_image,
+                              recipe=json.loads(args.recipe.read_text()) if args.recipe else None,
+                              recipe_output=args.recipe_output)
     print("Saved:", path)

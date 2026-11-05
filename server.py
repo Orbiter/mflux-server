@@ -13,26 +13,50 @@ import hashlib
 import argparse
 import threading
 import binascii
+import math
+from contextlib import contextmanager, ExitStack
+from dataclasses import asdict
+from importlib.metadata import version as package_version
 from tempfile import TemporaryDirectory
 import mlx.core as mx
 from mlx.core import metal as metal_compat
-from PIL import Image
+from PIL import Image, ImageOps, PngImagePlugin
+from tqdm import tqdm
 from pathlib import Path
 from flask import Flask, request, Response, jsonify
 from flask_restx import Api, Resource, fields
 from flask_cors import CORS
 from flask import send_file, redirect
 from huggingface_hub import snapshot_download
+from huggingface_hub.errors import HfHubHTTPError
 from mflux.models.common.config import ModelConfig
+from mflux.callbacks.callback_registry import CallbackRegistry
 from mflux.models.flux.variants.txt2img.flux import Flux1
 from mflux.models.qwen.variants.txt2img.qwen_image import QwenImage
 from mflux.models.qwen21.variants.txt2img.qwen_image_21 import QwenImage21
+from mflux.models.qwen21.variants.edit.qwen_image_21_edit import QwenImage21Edit
+from mflux.models.qwen21.variants.controlnet.qwen_image_21_controlnet import QwenImage21Controlnet
+from mflux.models.qwen.variants.edit.qwen_image_edit import QwenImageEdit
+from mflux.models.anima import Anima
+from mflux.models.iris.variants import Iris
+from mflux.models.ming_image import MingImage
+from mflux.models.krea2.variants.controlnet.krea2_controlnet import Krea2Controlnet
+from mflux.models.common.checking.model_checker import ModelChecker
+from mflux.models.common.resolution.model_revisions import ModelRevisions
 from mflux.models.qwen.model.qwen_vae.qwen_vae import QwenVAE
 from mflux.models.fibo.variants.txt2img.fibo import FIBO
+from mflux.models.fibo2.variants import Fibo2, Fibo2Edit
+from mflux.models.fibo2.variants.edit.fibo2_edit_images import Fibo2EditImages
+from mflux.models.fibo2.model.fibo2_text_encoder.fibo2_caption_check import Fibo2CaptionCheck
 from mflux.models.flux2.variants.edit.flux2_klein_edit import Flux2KleinEdit
+from mflux.models.flux3.variants import Flux3Klein, Flux3KleinEdit
+from mflux.models.flux3.latent_creator.flux3_reference_images import MAX_REFERENCES as FLUX3_MAX_REFERENCE_IMAGES
 from mflux.models.ernie_image import ErnieImage
 from mflux.models.krea2 import Krea2
 from mflux.models.krea2.weights.krea2_weight_definition import Krea2WeightDefinition
+from mflux.models.moss_image import MOSSImage
+from mflux.models.moss_image.latent_creator import MOSSImageLatentCreator
+from mflux.models.moss_image.model.moss_image_scheduler import MOSSImageScheduler
 from mflux.models.ideogram4 import Ideogram4
 from mflux.models.ideogram4.latent_creator import Ideogram4LatentCreator
 from mflux.models.ideogram4.model.ideogram4_scheduler import Ideogram4Scheduler
@@ -42,6 +66,10 @@ from qwen21_context import cached_qwen21_context
 from qwen21_edit import MAX_REFERENCE_IMAGES, generate_qwen21_references
 from krea2_inference import optimized_krea2
 from flux2_inference import FLUX2_4B_NAMES, optimized_flux2
+from inference_runtime import instance_override
+from model_capabilities import (extend_registry, capabilities, resolve_entry, validate_load_options,
+                                validate_parameters, discover_saved_models, GENERATION_FIELDS,
+                                IMAGE_FIELDS, LOAD_FIELDS)
 
 # These class constants contain lazy reshape operations created during import.
 # Materialize them on their owning thread before Qwen/Krea decode on the worker.
@@ -101,9 +129,11 @@ metal_cache_limit = 0 # the cache limit for the metal library
 qwen21_context_cache = True
 krea2_optimizations = True
 flux2_optimizations = True
-DEFAULT_MODEL = "flux2-klein-4b"
+DEFAULT_MODEL = "flux-3-image-klein"
 model = DEFAULT_MODEL
 model_quantize = None # quantization level in use
+model_options = {}
+models_directory = os.environ.get('MFLUX_MODELS_DIR', '')
 model_lock = threading.Lock()
 model_load_requests = []
 model_worker_thread = None
@@ -128,12 +158,31 @@ MODEL_REGISTRY = {
     "fibo": {"loader": "fibo", "steps": 25},
     "briaai/Fibo-mlx-4bit": {"loader": "fibo", "steps": 25},
     "briaai/Fibo-mlx-8bit": {"loader": "fibo", "steps": 25},
+    **{
+        name: {"loader": "fibo2", "steps": 50, "guidance": 5.0}
+        for name in ("fibo2", "fibo-2.0-dev", "briaai/Fibo-2.0-dev")
+    },
+    **{
+        name: {"loader": "fibo2", "steps": 4, "guidance": 1.0}
+        for name in ("fibo2-edit-turbo", "fibo-2-edit-turbo", "fibo-2.0-edit-turbo",
+                     "briaai/Fibo-2.0-edit-turbo")
+    },
     "z-image-turbo": {"loader": "z-image", "steps": 9},
     "filipstrand/Z-Image-Turbo-mflux-4bit": {"loader": "z-image", "steps": 9},
     "flux2-klein-9b": {"loader": "flux2", "steps": 4, "guidance": 1.0},
     "black-forest-labs/FLUX.2-klein-9B": {"loader": "flux2", "steps": 4, "guidance": 1.0},
     "flux2-klein-4b": {"loader": "flux2", "steps": 4, "guidance": 1.0},
     "black-forest-labs/FLUX.2-klein-4B": {"loader": "flux2", "steps": 4, "guidance": 1.0},
+    **{
+        name: {"loader": "flux3", "steps": 16, "guidance": 1.0}
+        for name in ("flux3-image-klein", "flux3-klein", "flux3", "flux-3-image-klein",
+                     "black-forest-labs/flux-3-image-klein")
+    },
+    **{
+        name: {"loader": "flux3", "steps": 50, "guidance": 3.5}
+        for name in ("flux3-image-klein-base", "flux3-klein-base", "flux3-base", "flux-3-image-klein-base",
+                     "black-forest-labs/flux-3-image-klein-base")
+    },
     "ernie-image-turbo": {"loader": "ernie", "steps": 8, "guidance": 1.0},
     "baidu/ERNIE-Image-Turbo": {"loader": "ernie", "steps": 8, "guidance": 1.0},
     "ernie-image": {"loader": "ernie", "steps": 50, "guidance": 4.0},
@@ -142,6 +191,11 @@ MODEL_REGISTRY = {
     "krea-2": {"loader": "krea2", "steps": 8, "guidance": 1.0},
     "krea-2-turbo": {"loader": "krea2", "steps": 8, "guidance": 1.0},
     "krea/Krea-2-Turbo": {"loader": "krea2", "steps": 8, "guidance": 1.0},
+    **{
+        name: {"loader": "moss-image", "steps": 50, "guidance": 3.0}
+        for name in ("moss-image-sft", "moss-image", "moss", "OpenMOSS-Team/MOSS-Image-SFT",
+                     "moss-image-base", "moss-base", "OpenMOSS-Team/MOSS-Image-Base")
+    },
     **{
         name: {
             "loader": "ideogram4",
@@ -152,6 +206,7 @@ MODEL_REGISTRY = {
         for name in ("ideogram4", "ideogram-4-fp8", "ideogram-ai/ideogram-4-fp8")
     },
 }
+extend_registry(MODEL_REGISTRY)
 
 FLUX2_NAME_MAP = {
     "black-forest-labs/flux.2-klein-9b": "flux2-klein-9b",
@@ -172,9 +227,8 @@ def _normalize_flux2_model_name(model_name: str) -> str:
 
 def image_capabilities(model_name: str):
     """Input limits for the adapters implemented by this server."""
-    loader = MODEL_REGISTRY[model_name]["loader"]
-    limit = {"ideogram4": 0, "flux2": 4, "qwen21": MAX_REFERENCE_IMAGES}.get(loader, 1)
-    return {"edit": limit > 0, "multi_image_edit": limit > 1, "max_init_images": limit}
+    info = capabilities(model_name, MODEL_REGISTRY[model_name])
+    return {key: info[key] for key in ('edit', 'multi_image_edit', 'max_init_images')}
 
 
 def validate_image_count(model_name: str, count: int):
@@ -197,153 +251,300 @@ def decode_input_images(args, model_name: str):
     if single:
         entries = [("init_image", single)]
     validate_image_count(model_name, len(entries))
-    decoded = []
-    for field, value in entries:
-        try:
-            if not isinstance(value, str) or not value.strip():
-                raise ValueError("expected a nonempty string")
-            value = value.strip()
-            if value.lower().startswith("data:"):
-                header, value = value.split(",", 1)
-                if not header.lower().startswith("data:image/") or not header.lower().endswith(";base64"):
-                    raise ValueError("expected an image data URL")
-            raw = base64.b64decode("".join(value.split()), validate=True)
-            with Image.open(io.BytesIO(raw)) as source:
-                source.load()
-                decoded.append(source.copy())
-        except (ValueError, binascii.Error, OSError, Image.DecompressionBombError) as exc:
-            raise ValueError(f"{field}: invalid base64 image or image data URL.") from exc
-    return decoded
+    return [decode_encoded_image(value, field) for field, value in entries]
 
 
-def load_model(model_name: str, quantize: int | None):
-    info = MODEL_REGISTRY.get(model_name, {})
+def decode_encoded_image(value, field):
+    try:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError('expected a nonempty string')
+        value = value.strip()
+        if value.lower().startswith('data:'):
+            header, value = value.split(',', 1)
+            if not header.lower().startswith('data:image/') or not header.lower().endswith(';base64'):
+                raise ValueError('expected an image data URL')
+        raw = base64.b64decode(''.join(value.split()), validate=True)
+        with Image.open(io.BytesIO(raw)) as source:
+            source.load()
+            return ImageOps.exif_transpose(source).copy()
+    except (ValueError, binascii.Error, OSError, Image.DecompressionBombError) as exc:
+        raise ValueError(f'{field}: invalid base64 image or image data URL.') from exc
+
+
+def current_load_spec():
+    info = MODEL_REGISTRY[model]
+    return {'model': model, 'quantize': model_quantize, 'options': dict(model_options),
+            **({'base_model': info['base_model']} if info.get('base_model') else {})}
+
+
+def prepare_generation(payload, name, quantize, loaded_options, load_spec):
+    """Prepare a queue-owned task and an image-free recipe for exact request replay."""
+    if not isinstance(payload, dict):
+        raise ValueError('The request must be an object.')
+    args = dict(payload)
+    replay = args.pop('recipe', None)
+    if replay is not None:
+        if not isinstance(replay, dict) or replay.get('schema_version') != 1:
+            raise ValueError('recipe must use schema_version 1.')
+        if replay.get('load') != load_spec:
+            raise ValueError('Load the model and options in recipe.load before replaying it.')
+        if replay.get('runtime') is not None and replay['runtime'] != runtime_settings():
+            raise ValueError('Match the server cache/optimization flags recorded in recipe.runtime before replaying.')
+        if replay.get('mflux_version', package_version('mflux')) != package_version('mflux'):
+            raise ValueError('Recipe mflux_version differs from the running server.')
+        generation = replay.get('generation')
+        if not isinstance(generation, dict):
+            raise ValueError('recipe.generation must be an object.')
+        args = {**generation, **args}
+    info = MODEL_REGISTRY[name]
+    caps = capabilities(name, info)
+    if loaded_options.get('qwen21_backend') == 'legacy':
+        caps.update(default_format='JPEG', dimension_multiple=16, min_dimension=16, rgba=False, mask=False)
+    prompt = args.get('prompt', 'A beautiful landscape')
+    if not isinstance(prompt, str):
+        raise ValueError('prompt must be a string.')
+    seed = str(args.get('seed', int(time.time())))
+    int(seed)
+    for key, default in (('width', 1024), ('height', 1024), ('steps', caps['default_steps'])):
+        value = args.get(key, default)
+        if type(value) is not int:
+            raise ValueError(f'{key} must be an integer.')
+        args[key] = value
+    guidance = args.get('guidance', caps['default_guidance'])
+    if type(guidance) not in (int, float):
+        raise ValueError('guidance must be a number.')
+    args['guidance'] = float(guidance)
+    raw_images = args.get('init_images', [])
+    count = len(raw_images) if isinstance(raw_images, list) else 0
+    if args.get('init_image'):
+        count = 1
+    if (info['loader'] == 'qwen21' and loaded_options.get('qwen21_backend') != 'legacy'
+            and args.get('use_step_cache') and not args.get('use_kv_cache', qwen21_context_cache)):
+        raise ValueError('use_step_cache requires use_kv_cache.')
+    validate_parameters(name, info, args, count, loaded_options)
+    if info['loader'] == 'moss-image':
+        MOSSImageLatentCreator.check_size(height=args['height'], width=args['width'])
+        MOSSImageScheduler.compute_sigmas(args['steps'])
+        if 'uncond_skip_layers' in args:
+            from mflux.models.moss_image.model.moss_image_transformer.moss_image_transformer import MOSSImageTransformer
+            from mflux.models.moss_image.weights.moss_image_weight_mapping import MOSSImageWeightMapping
+            MOSSImageTransformer.check_skip_layers(args['uncond_skip_layers'], MOSSImageWeightMapping.NUM_TRANSFORMER_LAYERS)
+    if info['loader'] == 'fibo2':
+        Fibo2CaptionCheck.check(prompt, edit=count > 0)
+    if info['loader'] == 'qwen21':
+        from mflux.models.qwen21.model.qwen21_scheduler import Qwen21TurboScheduler
+        config = ModelConfig.from_name(info.get('config_name', name))
+        Qwen21TurboScheduler.check_generate(config, args['steps'], args['guidance'], args.get('scheduler', 'linear'))
+    preset = args.get('preset', IDEOGRAM4_DEFAULT_PRESET)
+    if info['loader'] == 'ideogram4':
+        Ideogram4LatentCreator.validate_dimensions(width=args['width'], height=args['height'])
+        args['steps'] = Ideogram4Scheduler.get_preset(preset).num_steps
+        Ideogram4PromptEncoder.resolve_prompt(prompt, strict_caption_validation=args.get('strict_caption_validation', False),
+                                             warn_on_caption_issues=False)
+    images = decode_input_images(args, name)
+    aux_images = {}
+    for field in IMAGE_FIELDS:
+        if args.get(field):
+            # Decode auxiliary inputs with the same strict base64/data-URL rules.
+            aux_images[field] = decode_encoded_image(args[field], field)
+    if aux_images.get('mask_image') and images and aux_images['mask_image'].size != images[0].size:
+        raise ValueError('mask_image must have the same dimensions as the first source image.')
+    output_format = args.get('format', caps['default_format'])
+    if not isinstance(output_format, str) or output_format.upper() not in ('PNG', 'JPEG'):
+        raise ValueError('format must be PNG or JPEG.')
+    quality = args.get('quality', 85)
+    if type(quality) is not int or not 1 <= quality <= 100:
+        raise ValueError('quality must be an integer between 1 and 100.')
+    if type(args.get('priority', False)) is not bool:
+        raise ValueError('priority must be a boolean.')
+    options = {key: args[key] for key in GENERATION_FIELDS if key in args}
+    generation = dict(prompt=prompt, seed=seed, width=args['width'], height=args['height'],
+                      steps=args['steps'], guidance=args['guidance'], format=output_format.upper(),
+                      quality=quality, priority=args.get('priority', False), **options)
+    hashes = {'init_images': [input_digest(image) for image in images],
+              **{key: input_digest(image) for key, image in aux_images.items()}}
+    if replay is not None and replay.get('inputs', {}) != hashes:
+        raise ValueError('Replay requires the same source, mask and control images recorded in recipe.inputs.')
+    config = ModelConfig.from_name(info.get('config_name', name))
+    source = info.get('source') or (name if '/' in name and name != config.controlnet_model else config.model_name)
+    revisions = {source: ModelRevisions.get(source)}
+    if config.controlnet_model:
+        control_source = loaded_options.get('controlnet_path', config.controlnet_model)
+        revisions[control_source] = ModelRevisions.get(control_source)
+    if loaded_options.get('small_text_encoder'):
+        if info['loader'] == 'flux2':
+            from mflux.models.flux2.model.flux2_text_encoder.small_text_encoder import SMALL_ENCODER_REPO, ADAPTER_REPO
+            components = (SMALL_ENCODER_REPO, ADAPTER_REPO)
+        else:
+            from mflux.models.qwen21.model.qwen21_small_text_encoder.zen_image_edit_weights import ZenImageEditWeights
+            components = (ZenImageEditWeights.REPO,)
+        revisions.update({component: ModelRevisions.get(component) for component in components})
+    if loaded_options.get('small_decoder'):
+        from mflux.models.flux2.model.flux2_vae.small_decoder import SMALL_DECODER_REPO
+        revisions[SMALL_DECODER_REPO] = ModelRevisions.get(SMALL_DECODER_REPO)
+    revisions.update({path: ModelRevisions.get(path) for path in loaded_options.get('lora_paths', [])})
+    recipe = {'schema_version': 1, 'load': load_spec, 'generation': generation,
+              'inputs': hashes, 'revisions': revisions, 'runtime': runtime_settings(),
+              'mflux_version': package_version('mflux')}
+    return {**generation, **({'negative_prompt': args.get('negative_prompt')}
+                            if 'negative_prompt' in caps['generation_options'] else {}),
+            'generation_options': options, 'init_images': images,
+            'aux_images': aux_images, 'init_image_count': len(images), 'recipe': recipe,
+            **({'preset': preset} if info['loader'] == 'ideogram4' else {})}
+
+
+def input_digest(image):
+    # Include palette colors and transparency, rather than hashing palette indices.
+    image = image.convert('RGBA')
+    digest = hashlib.sha256()
+    digest.update(f'{image.mode}:{image.size}'.encode())
+    digest.update(image.tobytes())
+    return digest.hexdigest()
+
+
+def runtime_settings():
+    return {'qwen21_context_cache': qwen21_context_cache, 'flux2_optimizations': flux2_optimizations,
+            'krea2_optimizations': krea2_optimizations}
+
+
+def load_model(model_name: str, quantize: int | None, options=None, entry=None):
+    info = entry or MODEL_REGISTRY.get(model_name, {})
     loader = info.get("loader")
+    options = validate_load_options(model_name, info, quantize, options or {})
     effective_quantize = quantize if quantize is not None else info.get("quantize")
-    model_path = model_name if "/" in model_name else None
-    if loader == "flux":
+    model_path = info.get('source', model_name if "/" in model_name else None)
+    config_name = info.get('config_name', _normalize_flux2_model_name(model_name))
+    extras = {key: value for key, value in options.items()
+              if key not in ('vae_full_precision', 'qwen21_backend')}
+    if 'compute_precision' in extras:
+        extras['compute_precision'] = mx.float16 if extras['compute_precision'] == 'float16' else None
+    if options.get('lora_paths') and 'lora_scales' not in extras:
+        extras['lora_scales'] = [1.0] * len(options['lora_paths'])
+    if loader == "flux" and not extras and not info.get('source'):
         return Flux1.from_name(quantize=effective_quantize, model_name=model_name)
-    if loader == "flux2":
-        normalized_name = _normalize_flux2_model_name(model_name)
-        return Flux2KleinEdit(
-            model_config=ModelConfig.from_name(model_name=normalized_name),
-            quantize=effective_quantize,
-            model_path=model_path,
-        )
-    if loader == "qwen":
-        return QwenImage(quantize=effective_quantize, model_path=model_path)
-    if loader == "qwen21":
-        return QwenImage21(quantize=effective_quantize, model_path=model_path)
-    if loader == "ideogram4":
-        return Ideogram4(
-            model_config=ModelConfig.ideogram4_fp8(),
-            quantize=effective_quantize,
-            model_path=model_path,
-        )
-    if loader == "krea2":
-        model_config = ModelConfig.krea2()
-        # mflux 0.18.1's cache check overlooks the root turbo.safetensors file
-        # when component subdirectories are present. Complete the snapshot first.
-        model_path = snapshot_download(
-            repo_id=model_config.model_name,
-            allow_patterns=Krea2WeightDefinition.get_download_patterns(),
-        )
-        return Krea2(
-            model_config=model_config,
-            quantize=effective_quantize,
-            model_path=model_path,
-        )
-    if loader == "fibo":
-        return FIBO(quantize=effective_quantize, model_path=model_path)
-    if loader == "ernie":
-        model_config_factory = ERNIE_CONFIG_MAP.get(model_name.lower())
-        if model_config_factory is None:
-            raise ValueError(f"Unknown ERNIE model '{model_name}'")
-        return ErnieImage(
-            model_config=model_config_factory(),
-            quantize=effective_quantize,
-            model_path=model_path,
-        )
-    if loader == "z-image":
-        return ZImage(
-            model_config=ModelConfig.from_name(model_name="z-image-turbo"),
-            quantize=effective_quantize,
-            model_path=model_path,
-        )
-    raise ValueError(f"Unknown model loader for '{model_name}'")
-
-def generate_with_model(instance, model_name: str, task, init_image_path):
-    info = MODEL_REGISTRY.get(model_name, {})
-    # Accept the former single-path call form as well as the worker's ordered list.
-    paths = list(init_image_path) if isinstance(init_image_path, (list, tuple)) else (
-        [init_image_path] if init_image_path is not None else []
-    )
-    validate_image_count(model_name, len(paths))
-    init_image_path = paths[0] if paths else None
-    if info.get("loader") == "ideogram4":
-        if init_image_path is not None:
-            raise ValueError("Ideogram 4 does not support init_image (image-to-image generation).")
-        # Passing steps would replace the preset's per-step guidance schedule.
-        return instance.generate_image(
-            seed=int(task['seed']),
-            prompt=task['prompt'],
-            height=task['height'],
-            width=task['width'],
-            preset=task.get('preset', IDEOGRAM4_DEFAULT_PRESET),
-            strict_caption_validation=task.get('strict_caption_validation', False),
-        )
-    steps = task['steps'] or MODEL_REGISTRY.get(model_name, {}).get("steps", 4)
-    guidance = task['guidance'] or info.get("guidance", 3.5)
-    prompt = task['prompt']
-    if info.get("loader") == "fibo":
-        try:
-            json.loads(prompt)
-        except json.JSONDecodeError:
-            prompt = json.dumps({"prompt": prompt})
-    common_kwargs = {
-        "seed": int(task['seed']),
-        "prompt": prompt,
-        "num_inference_steps": steps,
-        "height": task['height'],
-        "width": task['width'],
-        "image_path": init_image_path,
-        "image_strength": 0.4 if init_image_path else None
+    constructors = {
+        'flux': Flux1, 'flux2': Flux2KleinEdit, 'flux3': Flux3KleinEdit,
+        'qwen21': QwenImage21 if options.get('qwen21_backend') == 'legacy' else QwenImage21Edit,
+        'qwen21-controlnet': QwenImage21Controlnet, 'qwen-edit': QwenImageEdit,
+        'anima': Anima, 'iris': Iris, 'ming': MingImage, 'krea2-controlnet': Krea2Controlnet,
+        'qwen': QwenImage, 'fibo': FIBO, 'fibo2': Fibo2Edit, 'moss-image': MOSSImage,
+        'ideogram4': Ideogram4, 'krea2': Krea2, 'ernie': ErnieImage, 'z-image': ZImage,
     }
-    if info.get("loader") == "flux2":
-        common_kwargs.pop("image_path")
-        common_kwargs.pop("image_strength")
-        # Reference conditioning starts from fresh noise; no img2img strength applies.
-        with optimized_flux2(instance, enabled=flux2_optimizations):
-            return instance.generate_image(**common_kwargs, image_paths=paths or None, guidance=1.0)
-    if info.get("loader") == "z-image":
-        return instance.generate_image(**common_kwargs)
-    if info.get("loader") == "qwen21":
-        common_kwargs["negative_prompt"] = task.get("negative_prompt")
-        if paths:
-            common_kwargs.pop("image_path")
-            common_kwargs.pop("image_strength")
-            return generate_qwen21_references(instance, paths, **common_kwargs, guidance=guidance,
-                                              use_cache=qwen21_context_cache)
-        with cached_qwen21_context(instance, enabled=qwen21_context_cache):
-            return instance.generate_image(**common_kwargs, guidance=guidance)
-    if info.get("loader") == "krea2":
-        common_kwargs["negative_prompt"] = task.get("negative_prompt")
-        with optimized_krea2(instance, enabled=krea2_optimizations):
-            return instance.generate_image(**common_kwargs, guidance=guidance)
-    return instance.generate_image(**common_kwargs, guidance=guidance)
+    if loader not in constructors:
+        raise ValueError(f"Unknown model loader for '{model_name}'")
+    kwargs = dict(quantize=effective_quantize, model_path=model_path, **extras)
+    if loader not in ('qwen', 'fibo'):
+        kwargs['model_config'] = ModelConfig.from_name(model_name=config_name)
+        if not info.get('source') and model_path == kwargs['model_config'].controlnet_model:
+            # A ControlNet repository contains the branch, not the base image model.
+            kwargs['model_path'] = None
+    if loader == 'krea2' and model_path is None:
+        config = ModelConfig.krea2()
+        kwargs['model_path'] = snapshot_download(
+            repo_id=config.model_name, revision=ModelRevisions.get(config.model_name),
+            allow_patterns=Krea2WeightDefinition.get_download_patterns())
+    instance = constructors[loader](**kwargs)
+    if options.get('vae_full_precision'):
+        from mflux.models.common.vae.block_decoder import VAEBlockDecoder
+        instance.vae.decode_mode = VAEBlockDecoder.FULL_PRECISION
+    # Model-owned state travels with the actual instance, including direct benchmark calls.
+    instance._server_load_options = options
+    return instance
 
-def _load_model_runtime_now(model_name: str, quantize: int | None):
-    global model_instance, model, model_quantize
-    if model_name not in MODEL_REGISTRY:
-        raise ValueError(f"Unknown model '{model_name}'")
-    info = MODEL_REGISTRY.get(model_name, {})
+def generate_with_model(instance, model_name: str, task, init_image_path, aux_paths=None):
+    info = MODEL_REGISTRY[model_name]
+    loader = info['loader']
+    paths = list(init_image_path) if isinstance(init_image_path, (list, tuple)) else (
+        [init_image_path] if init_image_path is not None else [])
+    validate_image_count(model_name, len(paths))
+    aux = aux_paths or {}
+    opts = dict(task.get('generation_options', {}))
+    opts.pop('negative_prompt', None)
+    loaded = getattr(instance, '_server_load_options', {})
+    loaded = loaded if isinstance(loaded, dict) else {}
+    guidance = task['guidance'] if task['guidance'] is not None else info.get('guidance', 3.5)
+    common = dict(seed=int(task['seed']), prompt=task['prompt'],
+                  num_inference_steps=task['steps'] or info.get('steps', 4),
+                  height=task['height'], width=task['width'])
+    negative = task.get('negative_prompt')
+    if loader == 'ideogram4':
+        common.pop('num_inference_steps')
+        return instance.generate_image(**common, preset=task.get('preset', IDEOGRAM4_DEFAULT_PRESET),
+            strict_caption_validation=task.get('strict_caption_validation', False),
+            **{k: v for k, v in opts.items() if k not in ('preset', 'strict_caption_validation')})
+    if loader == 'qwen21' and loaded.get('qwen21_backend') != 'legacy':
+        opts.setdefault('use_kv_cache', qwen21_context_cache)
+        if aux.get('mask_image'):
+            opts['mask_image'] = aux['mask_image']
+        return instance.generate_image(**common, image_paths=paths or None,
+                                       guidance=guidance, negative_prompt=negative, **opts)
+    if loader == 'qwen21-controlnet':
+        return instance.generate_image(**common, guidance=guidance, negative_prompt=negative,
+            controlnet_image_path=aux.get('control_image'), mask_image=aux.get('mask_image'),
+            image_path=paths[0] if paths else None, **opts)
+    if loader == 'krea2-controlnet':
+        return instance.generate_image(**common, guidance=guidance, negative_prompt=negative,
+            image_path=paths[0] if paths else None, depth_image_path=aux.get('depth_image'), **opts)
+    if loader == 'qwen-edit':
+        return instance.generate_image(**common, guidance=guidance, negative_prompt=negative,
+            image_paths=[str(path) for path in paths], image_path=str(paths[0]) if paths else None, **opts)
+    if loader in ('anima', 'iris', 'moss-image'):
+        return instance.generate_image(**common, guidance=guidance, negative_prompt=negative, **opts)
+    if loader == 'ming':
+        return instance.generate_image(**common, guidance=guidance)
+    if loader == 'fibo2':
+        if paths:
+            if aux.get('mask_image'):
+                opts['mask_path'] = aux['mask_image']
+            return instance.generate_image(**common, image_paths=paths, guidance=guidance,
+                                           negative_prompt=negative, **opts)
+        return Fibo2.generate_image(instance, **common, guidance=guidance, negative_prompt=negative, **opts)
+    if loader == 'flux3':
+        if paths:
+            return instance.generate_image(**common, image_paths=paths, guidance=guidance, **opts)
+        return Flux3Klein.generate_image(instance, **common, guidance=guidance, **opts)
+    if loader == 'flux2':
+        with optimized_flux2(instance, enabled=flux2_optimizations):
+            return instance.generate_image(**common, image_paths=paths or None, guidance=guidance, **opts)
+    common['image_path'] = paths[0] if paths else None
+    common['image_strength'] = 0.4 if paths else None
+    if loader == 'qwen21':
+        if paths:
+            common.pop('image_path'); common.pop('image_strength')
+            return generate_qwen21_references(instance, paths, **common, guidance=guidance,
+                negative_prompt=negative, use_cache=qwen21_context_cache)
+        with cached_qwen21_context(instance, enabled=qwen21_context_cache):
+            return instance.generate_image(**common, guidance=guidance, negative_prompt=negative)
+    if loader == 'z-image':
+        return instance.generate_image(**common, **opts)
+    if loader == 'krea2':
+        with optimized_krea2(instance, enabled=krea2_optimizations):
+            return instance.generate_image(**common, guidance=guidance, negative_prompt=negative, **opts)
+    if loader == 'fibo':
+        try:
+            json.loads(common['prompt'])
+        except json.JSONDecodeError:
+            common['prompt'] = json.dumps({'prompt': common['prompt']})
+    return instance.generate_image(**common, guidance=guidance, **opts)
+
+def _load_model_runtime_now(model_name: str, quantize: int | None, options=None, entry=None):
+    global model_instance, model, model_quantize, model_options
+    info = entry or resolve_entry(MODEL_REGISTRY, model_name)
+    options = validate_load_options(model_name, info, quantize, options or {})
+    if info.get('source') and Path(info['source']).is_dir():
+        checked = ModelChecker.check(info['source'], base_model=info['config_name'])
+        if checked.check != 'pass':
+            raise ValueError('Model package validation failed: ' + '; '.join(checked.problems))
     effective_quantize = quantize if quantize is not None else info.get("quantize")
     repo_id = model_name if "/" in model_name else None
     cache_before = _hf_repo_cached(repo_id) if repo_id else None
     start_time = time.time()
     print(f"Model load started: '{model_name}'")
     try:
-        loaded_instance = load_model(model_name, effective_quantize)
+        if options or entry is not None:
+            loaded_instance = load_model(model_name, effective_quantize, options, info)
+        else:
+            loaded_instance = load_model(model_name, effective_quantize)
     except Exception as exc:
         elapsed = time.time() - start_time
         exc_name = exc.__class__.__name__
@@ -361,20 +562,30 @@ def _load_model_runtime_now(model_name: str, quantize: int | None):
     else:
         print(f"Model load finished: '{model_name}' in {elapsed:.2f}s")
     with model_lock:
+        MODEL_REGISTRY[model_name] = info
         model = model_name
         model_quantize = effective_quantize
+        model_options = options
         model_instance = loaded_instance
 
 
-def load_model_runtime(model_name: str, quantize: int | None):
+def load_model_runtime(model_name: str, quantize: int | None, options=None, base_model=None):
+    entry = resolve_entry(MODEL_REGISTRY, model_name, base_model)
+    options = validate_load_options(model_name, entry, quantize, options or {})
+    extended = bool(options or base_model is not None or model_name not in MODEL_REGISTRY)
     if threading.current_thread() is model_worker_thread:
-        _load_model_runtime_now(model_name, quantize)
+        if extended:
+            _load_model_runtime_now(model_name, quantize, options, entry)
+        else:
+            _load_model_runtime_now(model_name, quantize)
         return
 
     done = threading.Event()
     request = {
         "model": model_name,
         "quantize": quantize,
+        "options": options if extended else None,
+        "entry": entry if extended else None,
         "done": done,
         "error": None
     }
@@ -394,7 +605,10 @@ def _process_model_load_request(worker_stream):
 
     try:
         with mx.stream(worker_stream):
-            _load_model_runtime_now(request["model"], request["quantize"])
+            if request.get('entry') is not None:
+                _load_model_runtime_now(request["model"], request["quantize"], request['options'], request['entry'])
+            else:
+                _load_model_runtime_now(request["model"], request["quantize"])
     except Exception as exc:
         request["error"] = exc
     finally:
@@ -424,19 +638,134 @@ def _new_mlx_worker_stream():
         return mx.new_stream(mx.gpu)
 
 
+def generation_progress(phase, step=0, total_steps=None, fraction=None, attempt=0):
+    return dict(phase=phase, step=step, total_steps=total_steps, fraction=fraction, attempt=attempt,
+                sampling_fraction=None, elapsed_seconds=None, remaining_seconds=None,
+                iterations_per_second=None, seconds_per_step=None, sampling_stats=None)
+
+
+class GenerationProgress:
+    """Expose native log counters and timing without evaluating or retaining tensors."""
+
+    def __init__(self, task):
+        self.task = task
+        self.step = self.attempt = 0
+        self.total = None
+        self.bar = None
+        self.native_display = False
+        self.display_hooks = ExitStack()
+        self.watched_bars = set()
+        self.metrics = {}
+        self.started = None
+
+    def publish(self, phase, fraction=None):
+        # Replace the snapshot atomically for concurrent /status readers.
+        self.task['progress'] = {**generation_progress(phase, self.step, self.total, fraction, self.attempt),
+                                 **self.metrics}
+
+    def capture(self, values):
+        self.step = max(0, int(values.get('n', 0)))
+        self.total = values.get('total', self.total)
+        elapsed = values.get('elapsed')
+        elapsed = float(elapsed) if isinstance(elapsed, (int, float)) and math.isfinite(elapsed) and elapsed >= 0 else None
+        rate = values.get('rate')
+        if not isinstance(rate, (int, float)) or not math.isfinite(rate) or rate <= 0:
+            completed = max(0, self.step - values.get('initial', 0))
+            rate = completed / elapsed if elapsed and completed else None
+        remaining = max(0, self.total - self.step) / rate if self.total and rate else None
+        sampling_fraction = min(1, self.step / self.total) if self.total else None
+        self.metrics = dict(sampling_fraction=sampling_fraction, elapsed_seconds=elapsed,
+                            remaining_seconds=remaining, iterations_per_second=rate,
+                            seconds_per_step=1 / rate if rate else None,
+                            sampling_stats=tqdm.format_meter(**{
+                                **values, 'elapsed': elapsed or 0, 'rate': rate, 'ncols': None, 'prefix': '',
+                                'bar_format': '{percentage:.0f}% · {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]'
+                            }))
+
+    def watch(self, bar):
+        if bar is self.bar:
+            return
+        self.bar = bar
+        self.native_display = isinstance(bar, tqdm) and not bar.disable
+        if not self.native_display:
+            return
+        original_display = bar.display
+
+        def display(*args, **kwargs):
+            result = original_display(*args, **kwargs)
+            if bar is self.bar:
+                self.capture(bar.format_dict)
+                self.publish('sampling', self.work_fraction())
+            return result
+
+        if id(bar) not in self.watched_bars:
+            self.display_hooks.enter_context(instance_override(bar, 'display', display))
+            self.watched_bars.add(id(bar))
+        self.capture(bar.format_dict)
+
+    def work_fraction(self):
+        return min(0.95, 0.95 * self.step / self.total) if self.total and self.attempt == 1 else None
+
+    def call_before_loop(self, config, **kwargs):
+        self.attempt += 1
+        self.step = 0
+        self.metrics = {}
+        self.started = time.monotonic()
+        self.bar = None
+        self.total = getattr(config.time_steps, 'total', None)
+        if self.total is None:
+            self.total = max(0, config.num_inference_steps - getattr(config, 'init_time_step', 0))
+        self.watch(config.time_steps)
+        self.publish('sampling', 0 if self.attempt == 1 else None)
+
+    def call_in_loop(self, time_steps=None, **kwargs):
+        if time_steps is not None:
+            self.watch(time_steps)
+        if self.native_display:
+            # Native display runs after the iterator resumes, including mx.eval on models
+            # such as FLUX 3. The callback itself may run before the GPU finishes a step.
+            return
+        self.step += 1
+        self.capture(dict(n=self.step, total=self.total, elapsed=time.monotonic() - self.started))
+        self.publish('sampling', self.work_fraction())
+
+    def call_after_loop(self, **kwargs):
+        self.publish('finishing', 0.95 if self.attempt == 1 else None)
+
+
+@contextmanager
+def track_generation_progress(instance, task):
+    registry = getattr(instance, 'callbacks', None)
+    reporter = GenerationProgress(task)
+    if isinstance(registry, CallbackRegistry):
+        registry.register(reporter)
+    try:
+        yield
+    finally:
+        try:
+            reporter.display_hooks.close()
+        finally:
+            if isinstance(registry, CallbackRegistry):
+                for callbacks in (registry.before_loop, registry.in_loop, registry.after_loop):
+                    callbacks[:] = [callback for callback in callbacks if callback is not reporter]
+
+
 def process_image_task(task, instance, model_name, quantize, worker_stream):
     """Run one queued request and release every temporary reference on all exit paths."""
     global pixels, ctime
     task['compute_time'] = time.time()
     task['model_used'] = model_name
     task['quantize_used'] = quantize
+    task['progress'] = generation_progress('preparing')
     try:
         inputs = task.get('init_images', [])
-        if inputs and (
+        aux_images = task.get('aux_images', {})
+        if (inputs or aux_images or 'recipe' in task) and (
             task.get('model_at_submit', model_name) != model_name
             or task.get('quantize_at_submit', quantize) != quantize
+            or ('recipe' in task and task['recipe']['load'] != current_load_spec())
         ):
-            raise ValueError("The loaded model changed after this image-edit request was queued; submit it again.")
+            raise ValueError("The loaded model changed after this generation request was queued; submit it again.")
         validate_image_count(model_name, len(inputs))
         _set_mlx_cache_limit(metal_cache_limit)
         with TemporaryDirectory(prefix="mflux-inputs-") as directory:
@@ -445,8 +774,17 @@ def process_image_task(task, instance, model_name, quantize, worker_stream):
                 path = Path(directory) / f"reference-{index + 1}.png"
                 input_image.save(path, format="PNG")
                 paths.append(path)
-            with mx.stream(worker_stream):
-                result = generate_with_model(instance, model_name, task, paths)
+            aux_paths = {}
+            for field, input_image in aux_images.items():
+                path = Path(directory) / f'{field}.png'
+                input_image.save(path, format='PNG')
+                aux_paths[field] = path
+            with mx.stream(worker_stream), track_generation_progress(instance, task):
+                result = (generate_with_model(instance, model_name, task, paths, aux_paths)
+                          if aux_paths else generate_with_model(instance, model_name, task, paths))
+            task['progress'] = {**task['progress'], 'phase': 'finishing'}
+            if isinstance(getattr(result, 'prompt', None), str) and 'recipe' in task:
+                task['recipe']['effective_prompt'] = result.prompt
             output = result.image
             output_format = task.get('format', 'JPEG').upper()
             if output_format not in ('PNG', 'JPEG'):
@@ -460,6 +798,10 @@ def process_image_task(task, instance, model_name, quantize, worker_stream):
                     output = output.convert('RGB')
             encoded = io.BytesIO()
             options = {'quality': task['quality']} if output_format == 'JPEG' else {}
+            if output_format == 'PNG' and 'recipe' in task:
+                metadata = PngImagePlugin.PngInfo()
+                metadata.add_text('mflux_recipe', json.dumps(task['recipe'], ensure_ascii=False))
+                options['pnginfo'] = metadata
             output.save(encoded, format=output_format, **options)
             encoded.seek(0)
         # Publish only once encoding and temporary-file cleanup have succeeded.
@@ -467,12 +809,15 @@ def process_image_task(task, instance, model_name, quantize, worker_stream):
         pixels += output.width * output.height
         task['format'] = output_format
         task['image'] = encoded
+        task['progress'] = {**task['progress'], 'phase': 'done', 'fraction': 1.0}
     except Exception as exc:
         task['error'] = f"{type(exc).__name__}: {exc}"
+        task['progress'] = {**task['progress'], 'phase': 'error'}
         app.logger.exception("Image generation failed for task %s", task['task_id'])
     finally:
         task['end_time'] = time.time()
         task.pop('init_images', None)
+        task.pop('aux_images', None)
         for cleanup in (_clear_mlx_cache, gc.collect):
             try:
                 cleanup()
@@ -523,21 +868,33 @@ class EncodedImageField(fields.Raw):
 # generate image endpoint
 
 task_model = api.model('TaskInput', {
-    'prompt': fields.String(description='The textual description, or a JSON caption encoded as a string for Ideogram 4.', default='A beautiful landscape', required=True),
+    'prompt': fields.String(description='Description or JSON caption/layout string; may be omitted when replaying a recipe.', default='A beautiful landscape', required=False),
     'init_image': EncodedImageField(description='One base64 image or image data URL; null or empty means no image. Cannot be combined with a nonempty init_images array.'),
     'init_images': fields.List(fields.String, description='Ordered base64 images or image data URLs for one output. Empty means no inputs. See /api/info for the model limit.'),
-    'negative_prompt': fields.String(description='Qwen Image 2.1 or Krea 2 negative conditioning; use guidance above 1.', required=False),
+    'negative_prompt': fields.String(description='Qwen Image 2.1, Krea 2 or FIBO 2 negative conditioning above guidance 1; MOSS-Image negative conditioning when guidance differs from 1. Unsupported by FLUX 3.', required=False),
     'seed': fields.String(description='Entropy Seed', default=str(int(time.time())), required=False),
     'height': fields.Integer(description='Image height', default=1024, required=False),
     'width': fields.Integer(description='Image width', default=1024, required=False),
     'steps': fields.Integer(description='Inference Steps (ignored by Ideogram 4; use preset)', default=MODEL_REGISTRY.get(model, {}).get("steps", 4), required=False),
-    'guidance': fields.Float(description='Guidance Scale (ignored by Ideogram 4; use preset)', default=MODEL_REGISTRY.get(model, {}).get("guidance", 3.5), required=False),
+    'guidance': fields.Float(description='Guidance Scale (ignored by distilled FLUX 3 and Ideogram 4; use preset for Ideogram 4)', default=MODEL_REGISTRY.get(model, {}).get("guidance", 3.5), required=False),
     'preset': fields.String(description='Ideogram 4 sampler preset', enum=list(IDEOGRAM4_PRESETS), default=IDEOGRAM4_DEFAULT_PRESET, required=False),
     'strict_caption_validation': fields.Boolean(description='Reject Ideogram 4 caption warnings before queuing', default=False, required=False),
-    'format': fields.String(description='The image format (JPEG or PNG), default is JPEG', default="JPEG", required=False),
+    'format': fields.String(description='JPEG or PNG; PNG is the default for Qwen 2.1, Qwen ControlNet and Ming.', required=False),
     'quality': fields.Integer(description='JPEG compression quality (1-100) if format is JPEG, default is 85', default=85, required=False),
     'priority': fields.Boolean(description='Set to true to put this task to the head of the queue', default=False, required=False)
 })
+for _field in IMAGE_FIELDS:
+    task_model[_field] = EncodedImageField(description='Base64 image or data URL; see /api/info for support.')
+task_model['recipe'] = fields.Raw(description='Recipe from /api/recipe; load recipe.load first and supply the original inputs.')
+for _field in ('scheduler', 'auto_mask'):
+    task_model[_field] = fields.String(description=f'Model-specific {_field}; see /api/info.')
+for _field in ('step_cache_ratio', 'cfg_end', 'strength', 'controlnet_strength', 'step_cache_threshold'):
+    task_model[_field] = fields.Float(description=f'Optional {_field}; see /api/info.')
+for _field in ('use_kv_cache', 'use_step_cache', 'enhance_prompt', 'verify', 'render_text_images'):
+    task_model[_field] = fields.Boolean(description=f'Optional {_field}; see /api/info.')
+for _field in ('verify_retries', 'output_resolution'):
+    task_model[_field] = fields.Integer(description=f'Optional {_field}; see /api/info.')
+task_model['uncond_skip_layers'] = fields.List(fields.Integer, description='MOSS negative-branch layers; [] disables skipping.')
 
 generate_response_model = api.model('GenerateResponse', {
     'task_id': fields.String(description='ID of the image generation task'),
@@ -565,7 +922,9 @@ class ListModels(Resource):
         """
         The /ls endpoint provides a catalog of available models and defaults.
         """
-        return jsonify({name: {**settings, **image_capabilities(name)} for name, settings in MODEL_REGISTRY.items()})
+        with model_lock:
+            entries = list(MODEL_REGISTRY.items())
+        return jsonify({name: {**settings, **capabilities(name, settings)} for name, settings in entries})
 
 info_model = api.model('ModelInfo', {
     'model': fields.String(description='Currently selected model'),
@@ -573,32 +932,49 @@ info_model = api.model('ModelInfo', {
     'edit': fields.Boolean(description='Accepts at least one input image (including ordinary img2img)'),
     'multi_image_edit': fields.Boolean(description='Combines multiple ordered references into one output'),
     'max_init_images': fields.Integer(description='Server input-image limit for this model'),
+    'min_init_images': fields.Integer(description='Minimum number of source images required'),
     'default_steps': fields.Integer(description='Default inference steps'),
     'default_guidance': fields.Float(description='Default guidance; ignored by models without guidance'),
+    'guidance_fixed': fields.Float(description='Required guidance, or null when configurable'),
     'context_kv_cache': fields.Boolean(description='Qwen 2.1 request-local prefix reuse enabled; unsupported inputs use native execution'),
     'inference_optimizations': fields.List(fields.String, description='Enabled model-specific inference optimizations'),
 })
+for _field in ('load_options', 'generation_options', 'quantization', 'schedulers'):
+    info_model[_field] = fields.List(fields.Raw, description=f'Supported {_field}.')
+for _field in ('dimension_multiple', 'min_dimension', 'max_dimension', 'min_steps', 'max_steps', 'fixed_steps'):
+    info_model[_field] = fields.Integer(description=f'Model-specific {_field}; null means unspecified.')
+for _field in ('mask', 'control_image', 'depth_image', 'rgba'):
+    info_model[_field] = fields.Boolean(description=f'Model supports {_field}.')
+info_model['options'] = fields.Raw(description='Currently loaded component and adapter options.')
+info_model['load'] = fields.Raw(description='Model-load configuration for recipes.')
+info_model['default_format'] = fields.String(description='PNG for RGBA models; JPEG otherwise.')
 
 @api.route('/info')
 class GetInfo(Resource):
     @api.response(200, 'Success', info_model)
     def get(self):
         with model_lock:
-            name, quantize = model, model_quantize
+            name, quantize, options = model, model_quantize, dict(model_options)
+            load_spec = current_load_spec()
         settings = MODEL_REGISTRY[name]
-        return jsonify({
-            'model': name, 'quantize': quantize,
-            **image_capabilities(name),
-            'default_steps': settings.get('steps', 4),
-            'default_guidance': settings.get('guidance', 3.5),
-            'context_kv_cache': qwen21_context_cache and settings.get('loader') == 'qwen21',
-            'inference_optimizations': (
-                ['prepared_text', 'cached_geometry', 'grouped_attention', 'image_only_output']
-                if krea2_optimizations and settings.get('loader') == 'krea2' else
-                ['prompt_cache', 'reference_encode_cache', 'predictor_cache']
-                if flux2_optimizations and name in FLUX2_4B_NAMES else []
-            ),
-        })
+        caps = capabilities(name, settings)
+        if options.get('small_text_encoder'):
+            caps['generation_options'] = [key for key in caps['generation_options']
+                                          if key not in ('auto_mask', 'enhance_prompt', 'verify', 'verify_retries')]
+        if options.get('qwen21_backend') == 'legacy':
+            caps.update(generation_options=['negative_prompt'], dimension_multiple=16, min_dimension=16,
+                        rgba=False, default_format='JPEG', mask=False)
+        native_qwen = settings['loader'] == 'qwen21' and options.get('qwen21_backend') != 'legacy'
+        optimizations = (['native_prefix_kv_cache'] if native_qwen and qwen21_context_cache else
+            ['prepared_text', 'cached_geometry', 'grouped_attention', 'image_only_output']
+            if krea2_optimizations and settings['loader'] == 'krea2' else
+            ['prompt_cache', 'reference_encode_cache', 'predictor_cache']
+            if flux2_optimizations and settings.get('config_name', name) in FLUX2_4B_NAMES else [])
+        return jsonify({'model': name, 'quantize': quantize, **caps,
+            'options': options, 'load': load_spec, 'cache_limit': metal_cache_limit,
+            'default_preset': settings.get('preset'), 'presets': settings.get('presets', {}),
+            'context_kv_cache': qwen21_context_cache and settings['loader'] == 'qwen21',
+            'inference_optimizations': optimizations})
 
 @api.route('/ps')
 class GetSettings(Resource):
@@ -607,46 +983,85 @@ class GetSettings(Resource):
         """
         The /ps endpoint provides the current server settings and default model.
         """
-        return jsonify({
-            "model": model,
-            **image_capabilities(model),
-            "quantize": model_quantize,
-            "cache_limit": metal_cache_limit,
-            "default_steps": MODEL_REGISTRY.get(model, {}).get("steps", 4),
-            "default_preset": MODEL_REGISTRY.get(model, {}).get("preset")
-        })
+        return GetInfo().get()
 
 @api.route('/load')
 class LoadModel(Resource):
     @api.response(200, 'Success')
     @api.response(400, 'Invalid model')
+    @api.response(401, 'Hugging Face model access is gated')
+    @api.response(503, 'Model repository or pinned revision is unavailable')
     def post(self):
         """
         The /load endpoint replaces the currently loaded model.
         """
         args = request.json or {}
-        requested_model = args.get('model')
-        if not requested_model:
-            return {"error": "model is required"}, 400
-        requested_quantize = args.get('quantize', None)
+        if not isinstance(args, dict) or not isinstance(args.get('model'), str) or not args['model'].strip():
+            return {'error': 'model is required'}, 400
         try:
-            if requested_quantize is not None:
+            unknown = set(args) - {'model', 'quantize', 'base_model', 'options'}
+            if unknown:
+                raise ValueError('Unknown load fields: ' + ', '.join(sorted(unknown)))
+            if 'options' in args and not isinstance(args['options'], dict):
+                raise ValueError('options must be an object.')
+            requested_model, requested_quantize = args['model'], args.get('quantize')
+            if isinstance(requested_quantize, str) and requested_quantize.isdigit():
                 requested_quantize = int(requested_quantize)
-            load_model_runtime(requested_model, requested_quantize)
-        except ValueError as exc:
-            return {"error": str(exc)}, 400
+            if args.get('options') or args.get('base_model'):
+                load_model_runtime(requested_model, requested_quantize, args.get('options', {}), args.get('base_model'))
+            else:
+                load_model_runtime(requested_model, requested_quantize)
+        except (ValueError, TypeError) as exc:
+            return {'error': str(exc)}, 400
         except Exception as exc:
             if _is_gated_repo_error(exc):
-                return {"error": "Model access appears gated; login to Hugging Face is required."}, 401
+                return {'error': 'Model access appears gated; login to Hugging Face is required.'}, 401
+            if isinstance(exc, HfHubHTTPError):
+                return {'error': f'Model repository or pinned revision is unavailable: {exc}'}, 503
             raise
-        return {
-            "model": model,
-            **image_capabilities(model),
-            "quantize": model_quantize,
-            "default_steps": MODEL_REGISTRY.get(model, {}).get("steps", 4),
-            "default_preset": MODEL_REGISTRY.get(model, {}).get("preset")
-        }
-    
+        return GetInfo().get()
+
+
+@api.route('/check')
+class CheckModel(Resource):
+    def post(self):
+        args = request.json or {}
+        try:
+            if not isinstance(args, dict) or not isinstance(args.get('model'), str):
+                raise ValueError('model is required.')
+            if set(args) - {'model', 'base_model'}:
+                raise ValueError('Only model and base_model are accepted; /api/check is read-only.')
+            entry = resolve_entry(MODEL_REGISTRY, args['model'], args.get('base_model'))
+            config = ModelConfig.from_name(entry.get('config_name', args['model']))
+            reference = entry.get('source') or (args['model'] if '/' in args['model']
+                and args['model'] != config.controlnet_model else config.model_name)
+            result = ModelChecker.check(reference,
+                                        base_model=entry.get('config_name', args['model']))
+            return asdict(result), 200 if result.check == 'pass' else 400
+        except (KeyError, ValueError, TypeError, OSError) as exc:
+            return {'error': str(exc)}, 400
+
+
+@api.route('/saved')
+class SavedModels(Resource):
+    def get(self):
+        with model_lock:
+            names = list(MODEL_REGISTRY)
+        return {'directory': models_directory,
+                'models': discover_saved_models(models_directory) if models_directory else [],
+                'base_models': names}
+
+
+@api.route('/recipe')
+class GetRecipe(Resource):
+    def get(self):
+        task_id = request.args.get('task_id')
+        for task in tasklist:
+            if task['task_id'] == task_id and 'recipe' in task:
+                return jsonify(task['recipe'])
+        return {'error': 'Recipe not found; retrieve it before deleting the image task.'}, 404
+
+
 @api.route('/generate')
 class GenerateImage(Resource):
     @api.expect(task_model, validate=True)
@@ -662,99 +1077,48 @@ class GenerateImage(Resource):
         Therefore the format has to be declared in the request at generation time in this endpoint.
         """
         global tasklist, pixels, ctime
-        # Parse the JSON body into a dictionary
-        args = request.json
-        prompt = args.get('prompt', 'A beautiful landscape')
-        seed = args.get('seed', str(int(time.time())))
-        height = int(args.get('height', 1024))
-        width = int(args.get('width', 1024))
+        args = request.json or {}
         with model_lock:
-            model_at_submit = model
-            quantize_at_submit = model_quantize
-        steps = int(args.get('steps', MODEL_REGISTRY[model_at_submit].get("steps", 4)))
-        guidance = float(args.get('guidance', MODEL_REGISTRY[model_at_submit].get("guidance", 3.5)))
-        format = args.get('format', 'JPEG').upper()
-        quality = args.get('quality', 85)
-        priority = args.get('priority', False)
-
-        preset = args.get('preset', IDEOGRAM4_DEFAULT_PRESET)
-        strict_caption_validation = args.get('strict_caption_validation', False)
-        if MODEL_REGISTRY[model_at_submit].get("loader") == "qwen21":
-            if width <= 0 or height <= 0 or width % 16 or height % 16:
-                return {"error": "Qwen Image 2.1 requires positive width and height divisible by 16."}, 400
-            if steps < 2:
-                return {"error": "Qwen Image 2.1 requires at least 2 steps."}, 400
-        if MODEL_REGISTRY[model_at_submit].get("loader") == "ideogram4":
-            try:
-                Ideogram4LatentCreator.validate_dimensions(width=width, height=height)
-                steps = Ideogram4Scheduler.get_preset(preset).num_steps
-                Ideogram4PromptEncoder.resolve_prompt(
-                    prompt,
-                    strict_caption_validation=strict_caption_validation,
-                    warn_on_caption_issues=False,
-                )
-                int(seed)
-            except ValueError as exc:
-                return {"error": str(exc)}, 400
-            guidance = None  # Guidance is a per-step schedule selected by the preset.
-
+            name, quantize, loaded_options = model, model_quantize, dict(model_options)
+            load_spec = current_load_spec()
         try:
-            init_images = decode_input_images(args, model_at_submit)
-        except ValueError as exc:
-            return {"error": str(exc)}, 400
-
+            prepared = prepare_generation(args, name, quantize, loaded_options, load_spec)
+        except (ValueError, TypeError, OverflowError) as exc:
+            return {'error': str(exc)}, 400
         start_time = time.time()
-        # taskid is a 8-digit hex hash to identify the image
-        md5 = hashlib.md5()
-        md5.update(str(start_time).encode())
-        task_id = md5.hexdigest()[:8]
-
-        task_metadata = {
-            'task_id': task_id,
-            'prompt': prompt,
-            'seed': seed,
-            'height': height,
-            'width': width,
-            'steps': steps,
-            'guidance': guidance,
-            'format': format,
-            'quality': quality,
-            'priority': priority,
-            'start_time': start_time,
-            'init_images': init_images,
-            'init_image_count': len(init_images),
-            'model_at_submit': model_at_submit,
-            'quantize_at_submit': quantize_at_submit
-        }
-        if MODEL_REGISTRY[model_at_submit].get("loader") == "ideogram4":
-            task_metadata['preset'] = preset
-            task_metadata['strict_caption_validation'] = strict_caption_validation
-        if MODEL_REGISTRY[model_at_submit].get("loader") in ("qwen21", "krea2"):
-            task_metadata['negative_prompt'] = args.get('negative_prompt')
-        
-        # compute waiting time based on the number of pixels in the queue
-        wait_for_pixels = width * height # include the current task
-        if priority and len(tasklist) > 1:
+        task_id = hashlib.md5(f'{start_time}-{time.monotonic_ns()}'.encode()).hexdigest()[:8]
+        task = {**prepared, 'task_id': task_id, 'start_time': start_time,
+                'model_at_submit': name, 'quantize_at_submit': quantize,
+                'progress': generation_progress('queued', fraction=0)}
+        wait_for_pixels = task['width'] * task['height']
+        if task['priority'] and len(tasklist) > 1:
             wait_for_pixels += count_pixels(1)
-            tasklist.insert(1, task_metadata)
+            tasklist.insert(1, task)
         else:
             wait_for_pixels += count_pixels(len(tasklist))
-            tasklist.append(task_metadata)
+            tasklist.append(task)
         worker_wakeup.set()
-
-        expected_time_seconds = ctime * wait_for_pixels / pixels
-        return {
-            'task_id': task_id,
-            'task_length': len(tasklist) - 1,
-            'expected_time_seconds': expected_time_seconds,
-            'model': model_at_submit,
-            'quantize': quantize_at_submit
-        }, 200
+        return {'task_id': task_id, 'task_length': len(tasklist) - 1,
+                'expected_time_seconds': ctime * wait_for_pixels / pixels,
+                'model': name, 'quantize': quantize}, 200
 
 status_model = api.model('Status', {
     'status': fields.String(description='Status of the image generation task', enum=['waiting', 'done', 'error']),
     'error': fields.String(description='Failure description when status is error'),
-    'pos': fields.Integer(description='Position in queue')
+    'pos': fields.Integer(description='Position in queue'),
+    'progress': fields.Nested(api.model('GenerationProgress', {
+        'phase': fields.String(enum=['queued', 'preparing', 'sampling', 'finishing', 'done', 'error']),
+        'step': fields.Integer(description='Completed sampling iterations, matching the native log counter'),
+        'total_steps': fields.Integer(description='Actual sampling-loop length, or null'),
+        'fraction': fields.Float(description='0–1 progress; null for unknown work. Sampling covers up to 0.95.'),
+        'attempt': fields.Integer(description='Sampling pass, starting at one; verification may retry'),
+        'sampling_fraction': fields.Float(description='Native sampling-loop progress, 0–1 independently of image finishing'),
+        'elapsed_seconds': fields.Float(description='Elapsed sampling time from the native progress display'),
+        'remaining_seconds': fields.Float(description='Estimated remaining sampling time, using the log rate'),
+        'iterations_per_second': fields.Float(description='Native smoothed sampling rate, or average when unavailable'),
+        'seconds_per_step': fields.Float(description='Inverse sampling rate, or null until available'),
+        'sampling_stats': fields.String(description='Native log formatter: percentage, iteration count, elapsed/remaining and rate')
+    }))
 })
 
 @api.route('/status')
@@ -770,6 +1134,11 @@ class GetStatus(Resource):
         .. or when the task is done:
         { "status": "done"}
         When the status is "done", the image can be retrieved with the /image endpoint.
+        Known task responses also include progress: phase, step, total_steps, fraction and attempt.
+        A null fraction means unknown work; sampling contributes up to 0.95 and a ready image is 1.
+        sampling_fraction (0–1), elapsed_seconds, remaining_seconds, iterations_per_second,
+        seconds_per_step and sampling_stats mirror the native sampling log; remaining time is an estimate.
+        These sampling metrics exclude image finishing and are null until available.
         A failed task returns { "status": "error", "error": "..." } and is not retried.
         If the task / the task_id is unknown, the endpoint returns a 404 status code.
         """
@@ -778,10 +1147,15 @@ class GetStatus(Resource):
         for i, task in enumerate(tasklist):
             if 'image' not in task and 'error' not in task: c += 1
             if task['task_id'] == task_id:
+                phase = ('error' if 'error' in task else 'done' if 'image' in task else
+                         'preparing' if 'compute_time' in task else 'queued')
+                progress = dict(task.get('progress', generation_progress(phase)))
                 if 'error' in task:
-                    return jsonify({'status': 'error', 'error': task['error']})
+                    progress['phase'] = 'error'
+                    return jsonify({'status': 'error', 'error': task['error'], 'progress': progress})
                 elif 'image' in task:
-                    return jsonify({'status': 'done'})
+                    progress.update(phase='done', fraction=1.0)
+                    return jsonify({'status': 'done', 'progress': progress})
                 else:
                     # compute the remaining time
                     wait_remaining = count_pixels(i + 1) * ctime / pixels
@@ -789,7 +1163,8 @@ class GetStatus(Resource):
                     compute_time = task.get('compute_time', start_time)
                     wait_remaining = int(wait_remaining - (time.time() - compute_time))
                     if wait_remaining < 1: wait_remaining = 1
-                    return jsonify({'status': 'waiting', 'pos': c, 'wait_remaining': wait_remaining})
+                    return jsonify({'status': 'waiting', 'pos': c, 'wait_remaining': wait_remaining,
+                                    'progress': progress})
         return Response(status=404)
 
 @api.route('/image')
@@ -844,7 +1219,7 @@ class CancelTask(Resource):
         return Response(status=404)
 
 task_output_model = api.model('TaskOutput', {
-    **{key: field for key, field in task_model.items() if key not in ('init_image', 'init_images')},
+    **{key: field for key, field in task_model.items() if key not in ('init_image', 'init_images', *IMAGE_FIELDS)},
     'init_image_count': fields.Integer(description='Number of input images'),
     'task_id': fields.String(description='ID of the image generation task', default=None, required=False),
     'start_time': fields.String(description='Time when the image generation task was submitted', default=None, required=False),
@@ -866,7 +1241,7 @@ class GetTasks(Resource):
         tasklist0 = []
         for task in tasklist:
             task0 = task.copy()
-            for field in ('image', 'init_images', 'init_image'):
+            for field in ('image', 'init_images', 'init_image', 'aux_images', *IMAGE_FIELDS):
                 task0.pop(field, None)
             tasklist0.append(task0)        
         return jsonify(tasklist0)
@@ -888,8 +1263,21 @@ def serve_index():
 
 def build_argument_parser():
     parser = argparse.ArgumentParser(description='Start a server to generate images with mflux.')
-    parser.add_argument('--model', type=str, default=DEFAULT_MODEL, choices=MODEL_REGISTRY.keys(), help='The model to use (default: flux2-klein-4b).')
-    parser.add_argument('--quantize',  "-q", type=int, choices=[4, 8], default=None, help='Quantize the model (4 or 8, Default is None)')
+    parser.add_argument('--model', type=str, default=DEFAULT_MODEL, help='Registered model, saved directory or HF repository.')
+    parser.add_argument('--base-model', choices=MODEL_REGISTRY.keys(), help='Required model family for custom checkpoints.')
+    parser.add_argument('--quantize', '-q', type=int, choices=[4, 5, 6, 8], default=None, help='Model-specific quantization; omit to keep stored precision.')
+    parser.add_argument('--models-dir', default=models_directory, help='Directory of saved model packages (MFLUX_MODELS_DIR).')
+    parser.add_argument('--lora', action='append', default=[], metavar='PATH', help='Repeat for multiple LoRAs.')
+    parser.add_argument('--lora-scale', action='append', type=float, help='One scale per --lora, in the same order.')
+    parser.add_argument('--bake-lora', action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument('--compute-precision', choices=['bfloat16', 'float16'])
+    parser.add_argument('--small-text-encoder', action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument('--small-decoder', action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument('--vae-full-precision', action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument('--text-encoder-quantize', type=int, choices=[4, 5, 6, 8])
+    parser.add_argument('--qwen21-backend', choices=['native', 'legacy'], default=None)
+    parser.add_argument('--controlnet-path')
+    parser.add_argument('--controlnet-strength', type=float)
     parser.add_argument('--host', type=str, default='127.0.0.1', help='The host to listen on')
     parser.add_argument('--port', type=int, default=4030, help='The port to listen on')
     parser.add_argument('--cache_limit', type=int, default=0, help='The metal cache limit in bytes')
@@ -905,13 +1293,24 @@ def main():
     parser = build_argument_parser()
     args = parser.parse_args()
 
-    global metal_cache_limit, qwen21_context_cache, krea2_optimizations, flux2_optimizations
+    global metal_cache_limit, qwen21_context_cache, krea2_optimizations, flux2_optimizations, models_directory
     metal_cache_limit = args.cache_limit
     qwen21_context_cache = args.qwen21_context_cache
     krea2_optimizations = args.krea2_optimizations
     flux2_optimizations = args.flux2_optimizations
+    models_directory = args.models_dir
+    options = {key: getattr(args, key) for key in LOAD_FIELDS
+               if hasattr(args, key) and getattr(args, key) is not None}
+    if args.lora_scale and not args.lora:
+        parser.error('--lora-scale requires at least one --lora.')
+    if args.lora:
+        options['lora_paths'] = args.lora
+        options['lora_scales'] = args.lora_scale or [1.0] * len(args.lora)
     threading.Thread(target=compute_image_task, daemon=True).start()
-    load_model_runtime(args.model, args.quantize)
+    if options or args.base_model:
+        load_model_runtime(args.model, args.quantize, options, args.base_model)
+    else:
+        load_model_runtime(args.model, args.quantize)
     print(f"Server started, view swagger API documentation at http://{args.host}:{args.port}/swagger")
     app.run(host=args.host, port=args.port)
 

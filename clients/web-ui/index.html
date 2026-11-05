@@ -1,315 +1,287 @@
 <!DOCTYPE html>
 <html lang="en">
-<!--
-# mflux-server web-ui
-# Javascript client and web front-end for the mflux-server
-# (C) 2024 by @orbiter Michael Peter Christen
-# This code is licensed under the Apache License, Version 2.0      
--->
+<!-- mflux-server web client · Copyright 2024 @orbiter · Apache-2.0 -->
 <head>
     <meta charset="UTF-8">
-    <title>MFLUX Server - Image Generation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#0c100e">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%230c100e'/%3E%3Cpath d='M7 25V11l9 8 9-8v14M7 5l9 8 9-8' fill='none' stroke='%2379e5a1' stroke-width='2'/%3E%3C/svg%3E">
+    <title>MFLUX Studio — Image generation</title>
     <style>
-        /* lit.css content with adjustments */
-        *{box-sizing:border-box}*+*{margin:.3em 0}pre{overflow:auto}@media(min-width:35em){.col{display:table-cell}.\31{width:5%}.\32{width:15%}.\33{width:22%}.\34{width:30%}.\35{width:40%}.\36{width:50%}.\37{width:68%}.\38{width:84%}.row{display:table;border-spacing:.5em 0}}.row,.w-100{width:100%}.card:focus,hr{outline:0;border:solid #fa0}.card,pre{padding:.5em;border:solid #eee}.btn:hover,a:hover{opacity:.6}.c{padding:.5em;margin:auto;font:1em/1.4 sans-serif}a{color:#fa0;text-decoration:none}.btn.primary{color:#000;background:#fa0;border:none}td,th{padding:.5em;text-align:left;border-bottom:solid #eee}.btn{padding:.5em;background:#fa0;color:#000;border:none;font:.7em sans-serif}
-        /* Font settings: one sans-serif font, no bold */
-        body, .c, h1, h2, h3, h4, h5, h6, label, input, textarea, button {
-            font-family: sans-serif;
-            font-weight: normal;
+        :root {
+            color-scheme: dark;
+            --canvas: #0c100e;
+            --panel: #121713;
+            --surface: #191f1b;
+            --line: #303a33;
+            --line-strong: #4d5b51;
+            --text: #e9eee8;
+            --muted: #97a69b;
+            --accent: #79e5a1;
+            --accent-ink: #a8f3c1;
+            --grip: conic-gradient(from 45deg, #536159 0deg 90deg, #151c17 90deg 180deg, #080d0a 180deg 270deg, #849087 270deg 360deg);
+            font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: var(--text);
+            background: var(--canvas);
+            font-synthesis: none;
+            text-rendering: optimizeLegibility;
+            -webkit-font-smoothing: antialiased;
         }
-	h1 {
-	    margin: 0;
-            padding: 0;
+        * { box-sizing: border-box; }
+        [hidden] { display: none !important; }
+        body { margin: 0; min-width: 320px; }
+        a { color: inherit; text-decoration: none; }
+        a:hover { color: var(--accent); }
+        :focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+        ::selection { background: #26593a; color: #fff; }
+        h2, p { margin: 0; }
+        h2 { font-weight: 500; line-height: 1.2; letter-spacing: -.035em; }
+        h2 { font-size: 26px; }
+        small { font-size: 12px; color: var(--muted); }
+        svg { display: block; flex: none; }
+        body > header {
+            min-height: 78px; padding: 0 32px; display: flex; align-items: center; gap: 48px;
+            border-bottom: 1px solid var(--line); position: relative;
+            background: linear-gradient(180deg, #141a16, var(--canvas));
         }
-        /* Dark mode adjustments */
-        body {
-            background-color: #000;
-            color: #fff;
+        body > header::after {
+            content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+            background: linear-gradient(90deg, var(--accent), #375e43 38%, transparent 88%);
         }
-        .c {
-            max-width: none;
+        body > header > a { display: flex; align-items: center; gap: 12px; font-size: 19px; letter-spacing: .16em; font-weight: 600; }
+        body > header > a svg { color: var(--accent); }
+        body > header > a span { padding-left: 14px; margin-left: 2px; border-left: 1px solid var(--line-strong); font-size: 11px; letter-spacing: .15em; color: var(--muted); font-weight: 400; }
+        body > header nav { display: flex; align-self: stretch; align-items: stretch; gap: 28px; }
+        body > header nav a { display: flex; align-items: center; position: relative; font-size: 13px; color: var(--muted); }
+        body > header nav a[aria-current] { color: var(--text); }
+        body > header nav a[aria-current]::after { content: ""; position: absolute; height: 2px; background: var(--accent); bottom: 0; left: 0; right: 0; }
+        body > header > details { margin-left: auto; position: relative; font-size: 12px; }
+        body > header > details > summary { border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; color: var(--muted); background: #151c17; }
+        body > header > details > summary::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); display: inline-block; margin-right: 8px; }
+        body > header > details > summary[data-connected="true"]::before { background: var(--accent); }
+        body > header > details > div { position: absolute; right: 0; top: 44px; width: min(340px, calc(100vw - 32px)); padding: 20px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel); box-shadow: 0 16px 40px #0008; z-index: 3; }
+        body > header > details p { color: var(--muted); margin-top: 10px; }
+        main { display: grid; grid-template-columns: 380px minmax(0, 1fr); min-height: calc(100svh - 123px); max-width: 1920px; margin: auto; }
+        aside { border-right: 1px solid var(--line); padding: 30px 26px 24px; background: linear-gradient(145deg, #151c17, #101511 65%); min-width: 0; }
+        aside > header { margin-bottom: 24px; }
+        aside > header > p, section > header p { color: var(--muted); font-size: 10px; letter-spacing: .17em; }
+        section > header p { margin-bottom: 9px; }
+        fieldset { border: 0; padding: 0; margin: 0 0 26px; min-width: 0; }
+        legend { display: flex; align-items: center; gap: 10px; padding: 0; margin-bottom: 16px; width: 100%; font-size: 12px; font-weight: 500; }
+        legend span { color: var(--accent); font: 10px/1.5 ui-monospace, monospace; }
+        legend::after { content: ""; height: 1px; flex: 1; background: var(--line); margin-left: 4px; }
+        label { display: block; font-size: 12px; color: #bdc8bf; margin: 0 0 14px; min-width: 0; }
+        label > small { font-size: 10px; margin-left: 4px; }
+        label output { float: right; color: var(--text); font: 11px/1.6 ui-monospace, monospace; }
+        label > input, label > select, label > textarea { margin-top: 7px; }
+        input, select, textarea, button { font: inherit; }
+        input, select, textarea {
+            width: 100%; min-width: 0; min-height: 38px; border: 1px solid var(--line-strong); border-radius: 3px;
+            background: linear-gradient(120deg, #0d120f, #151b17); color: var(--text); padding: 9px 11px;
+            box-shadow: inset 0 1px 3px #0003; transition: border-color .15s;
         }
-        /* Input and output containers */
-        .input-container, .output-container {
-            background-color: #333;
-            padding: .5em;
-            border-radius: 5px;
-            margin-bottom: .5em;
+        input:hover, select:hover, textarea:hover { border-color: #6c8072; }
+        input:focus, select:focus, textarea:focus { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 1px #79e5a126; }
+        input::placeholder, textarea::placeholder { color: #708076; opacity: 1; }
+        textarea { resize: vertical; line-height: 1.65; }
+        select { text-overflow: ellipsis; padding-right: 24px; cursor: pointer; }
+        option { background: #161e18; color: var(--text); }
+        button {
+            cursor: pointer; position: relative; border: 1px solid var(--line-strong); border-radius: 3px;
+            background: linear-gradient(#29312b, #161c18); color: var(--text); padding: 9px 14px;
+            box-shadow: inset 0 1px 0 #ffffff0c, 0 2px 3px #0003; transition: border-color .15s, background-color .15s;
         }
-        .input-label {
-            display: block;
-            margin-bottom: .3em;
-            font-weight: normal;
-            color: #fff;
+        button:hover { border-color: var(--accent); }
+        button:active { box-shadow: inset 0 2px 4px #0008; }
+        button:disabled, input:disabled, select:disabled { cursor: not-allowed; opacity: .42; }
+        button:disabled:hover { border-color: var(--line-strong); }
+        input[type="checkbox"] { width: 15px; min-height: 15px; accent-color: var(--accent); margin: 0; box-shadow: none; }
+        label:has(> input[type="checkbox"]) { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0; padding: 8px 0; }
+        input[type="file"] { font-size: 11px; padding: 7px; }
+        input[type="file"]::file-selector-button { border: 0; border-right: 1px solid var(--line-strong); background: transparent; color: var(--accent-ink); padding: 1px 9px 1px 0; margin-right: 9px; font: inherit; cursor: pointer; }
+        input[type="range"] { appearance: none; -webkit-appearance: none; height: 22px; min-height: 22px; padding: 0; border: 0; background: transparent; box-shadow: none; cursor: pointer; }
+        input[type="range"]:focus { box-shadow: none; }
+        input[type="range"]:focus-visible { outline: 1px solid var(--accent); outline-offset: 4px; }
+        input[type="range"]::-webkit-slider-runnable-track { height: 3px; border-radius: 2px; background: linear-gradient(to right, var(--accent) 0%, var(--accent) var(--slider-value, 50%), #37443b var(--slider-value, 50%), #37443b 100%); }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 19px; height: 23px; margin-top: -10px; border: 1px solid #7c8a7f; border-radius: 3px; background: var(--grip) 0 0 / 8px 8px; box-shadow: 0 2px 5px #000b; }
+        input[type="range"]::-moz-range-track { height: 3px; background: #37443b; }
+        input[type="range"]::-moz-range-progress { height: 3px; background: var(--accent); }
+        input[type="range"]::-moz-range-thumb { width: 19px; height: 23px; border: 1px solid #7c8a7f; border-radius: 3px; background: var(--grip) 0 0 / 8px 8px; box-shadow: 0 2px 5px #000b; }
+        fieldset > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
+        menu { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 0; margin: -4px 0 0; list-style: none; }
+        menu li:last-child { margin-left: auto; }
+        menu button { font-size: 11px; padding: 5px 9px; min-height: 30px; }
+        menu small { font-size: 10px; }
+        ol { list-style: none; margin: 10px 0 0; padding: 0; max-height: 125px; overflow-y: auto; }
+        ol:empty { display: none; }
+        ol li { display: flex; align-items: center; gap: 4px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+        ol li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; font-size: 11px; color: var(--muted); }
+        ol button { flex: none; padding: 3px 7px; font-size: 12px; box-shadow: none; }
+        details > summary { cursor: pointer; list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+        details > summary::after { content: "+"; float: right; color: var(--muted); margin-left: 16px; }
+        details[open] > summary::after { content: "−"; }
+        form > details { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-top: -5px; }
+        form > details > summary { padding: 16px 0; font-size: 12px; }
+        form > details > fieldset { margin-top: 18px; }
+        form > details p { color: var(--muted); font-size: 11px; margin: 6px 0 14px; }
+        form > details label { margin-top: 6px; }
+        fieldset > div:empty { display: none; }
+        fieldset > div > label:has(textarea), fieldset > div > label:has(input[type="file"]) { grid-column: 1 / -1; }
+        fieldset > button { width: 100%; font-size: 12px; padding-right: 40px; }
+        button[type="submit"]::after, fieldset > button::after {
+            content: ""; position: absolute; right: 2px; top: 2px; bottom: 2px; width: 32px;
+            background: var(--grip) center / 8px 8px; border-left: 1px solid #506856; opacity: .72;
         }
-        input, textarea {
-            background-color: #555;
-            color: #fff;
-            border: none;
-            padding: .3em;
-            width: 100%;
+        form > footer { padding-top: 22px; }
+        button[type="submit"] { width: 100%; min-height: 49px; text-align: left; padding: 12px 48px 12px 17px; border-color: #548269; color: var(--accent-ink); font-size: 14px; background: linear-gradient(120deg, #21422e, #172d1f); }
+        button[type="submit"]:hover { background: linear-gradient(120deg, #2a543a, #1b3625); border-color: var(--accent); }
+        section { min-width: 0; padding: 30px 32px 0; display: flex; flex-direction: column; background: radial-gradient(ellipse at 70% 0%, #19241b55, transparent 65%); }
+        section > header { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
+        section h2 output { display: inline-flex; vertical-align: middle; justify-content: center; align-items: center; min-width: 25px; height: 23px; margin-left: 10px; padding: 0 5px; border: 1px solid var(--line-strong); border-radius: 3px; font: 11px ui-monospace, monospace; letter-spacing: 0; color: var(--muted); }
+        section > header > small { font-size: 11px; padding-bottom: 4px; }
+        section > fieldset { margin: 0; padding: 0 0 20px; border-bottom: 1px solid var(--line); }
+        section > fieldset > div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin-bottom: 7px; }
+        section > fieldset label { flex: none; margin: 0; }
+        section > fieldset output { float: none; text-align: right; color: var(--muted); font: 11px/1.5 ui-monospace, monospace; overflow-wrap: anywhere; }
+        section > fieldset > div:not(:first-child) { margin-top: 17px; }
+        progress { appearance: none; -webkit-appearance: none; display: block; width: 100%; height: 6px; border: 0; border-radius: 2px; overflow: hidden; background: #2a3830; accent-color: var(--accent); }
+        progress::-webkit-progress-bar { background: #2a3830; border-radius: 2px; }
+        progress::-webkit-progress-value { background: var(--accent); border-radius: 2px; transition: width .25s ease; }
+        progress::-moz-progress-bar { background: var(--accent); border-radius: 2px; }
+        progress:indeterminate { background: linear-gradient(90deg, transparent, var(--accent), transparent) -55% 0 / 35% 100% no-repeat, #2a3830; animation: sampling-progress 1.6s linear infinite; }
+        progress:indeterminate::-webkit-progress-bar, progress:indeterminate::-webkit-progress-value { background: transparent; }
+        progress:indeterminate::-moz-progress-bar { background: transparent; }
+        section > fieldset[data-state="error"] output { color: #dfc78b; }
+        section > fieldset[data-state="error"] progress::-webkit-progress-value { background: #dfc78b; }
+        section > fieldset[data-state="error"] progress::-moz-progress-bar { background: #dfc78b; }
+        @keyframes sampling-progress { to { background-position: 155% 0; } }
+        section > div { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); align-content: start; align-items: start; gap: 24px; padding: 25px 0 32px; }
+        section > div:has(> article), section > div:empty { flex: 1; min-height: 380px; align-content: center; }
+        article { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 52px 24px 72px; }
+        article > svg { width: 90px; height: 90px; color: #5d7565; margin-bottom: 30px; }
+        article > p { color: var(--muted); max-width: 310px; font-size: 13px; line-height: 1.8; }
+        figure { margin: 0; min-width: 0; }
+        figure > a { display: block; padding: 4px; border: 1px solid var(--line-strong); border-radius: 4px; background: #080d0a; transition: border-color .15s; }
+        figure > a:hover, figure > a:focus-visible { border-color: var(--accent); }
+        figure img { width: 100%; height: auto; max-height: 640px; object-fit: contain; display: block; border-radius: 1px; }
+        figcaption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 10px 0 0; font-size: 12px; }
+        figcaption > span { display: flex; flex-direction: column; gap: 2px; }
+        figcaption small { font: 9px ui-monospace, monospace; letter-spacing: .03em; }
+        figcaption nav { display: flex; align-items: start; gap: 12px; font-size: 11px; color: var(--accent-ink); }
+        section > footer { display: flex; justify-content: space-between; gap: 18px; margin-top: auto; border-top: 1px solid var(--line); padding: 16px 0; color: var(--muted); font-size: 10px; }
+        section > footer span { font-family: ui-monospace, monospace; letter-spacing: .08em; }
+        body > footer { border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 14px 32px; color: #7d9183; font-size: 10px; letter-spacing: .02em; }
+        body > footer p::before { content: ""; display: inline-block; width: 5px; height: 5px; background: var(--accent); margin-right: 9px; }
+        [data-standard="true"] { color: var(--accent); }
+        [data-standard="false"] { color: #dfc78b; }
+        @media (min-width: 1600px) { main { grid-template-columns: 410px minmax(0, 1fr); } aside { padding: 34px; } section { padding: 34px 42px 0; } }
+        @media (max-width: 900px) { main { grid-template-columns: 340px minmax(0, 1fr); } aside { padding: 26px 20px; } section { padding: 28px 24px 0; } body > header { padding: 0 22px; gap: 30px; } section > header > small { display: none; } }
+        @media (max-width: 700px) {
+            body > header { min-height: 68px; padding: 0 18px; gap: 20px; flex-wrap: wrap; }
+            body > header > a { font-size: 17px; }
+            body > header > a span { display: none; }
+            body > header nav { gap: 18px; }
+            body > header nav a { min-height: 68px; font-size: 12px; }
+            body > header > details > summary { font-size: 0; padding: 8px; }
+            body > header > details > summary::before { margin-right: 0; }
+            body > header > details > summary::after { display: none; }
+            main { display: block; }
+            aside { border-right: 0; border-bottom: 1px solid var(--line); padding: 28px 22px; }
+            section { padding: 28px 22px 0; min-height: 540px; }
+            section > div { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+            article { padding: 42px 14px 60px; }
+            body > footer { padding: 14px 22px; }
         }
-        input[type="range"] {
-            width: 100%;
-            -webkit-appearance: none;
-            background: #777;
-            height: 5px;
-            border-radius: 5px;
-            outline: none;
-            margin-bottom: .5em;
-        }
-        /* Slider track and thumb styling */
-        input[type="range"]::-webkit-slider-runnable-track {
-            height: 5px;
-            background: linear-gradient(to right, #fa0 0%, #fa0 var(--slider-value, 50%), #777 var(--slider-value, 50%), #777 100%);
-            border-radius: 5px;
-        }
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 15px;
-            height: 15px;
-            background: #fa0;
-            cursor: pointer;
-            border-radius: 50%;
-            margin-top: -5px; /* Offset to center the thumb */
-        }
-        input[type="range"]::-moz-range-track {
-            height: 5px;
-            background: #777;
-            border-radius: 5px;
-        }
-        input[type="range"]::-moz-range-progress {
-            background: #fa0;
-            height: 5px;
-            border-radius: 5px;
-        }
-        input[type="range"]::-moz-range-thumb {
-            width: 15px;
-            height: 15px;
-            background: #fa0;
-            cursor: pointer;
-            border-radius: 50%;
-            border: none;
-        }
-        .btn.primary {
-            background-color: #fa0;
-            color: #000;
-            border: none;
-            padding: 1em 2em; /* Increased size */
-            font-size: 1.2em;
-            line-height: 10px;
-        }
-        .btn.primary:hover {
-            opacity: .8;
-        }
-        .row .col {
-            vertical-align: top;
-            padding-right: .5em;
-        }
-        .full-width {
-            width: 100%;
-        }
-        textarea {
-            resize: vertical;
-        }
-        #generate-button {
-            margin-top: .3em;
-            width: 200px; /* Double original size */
-            height: 40px;
-            background-color: #fa0;
-            color: #000;
-            border: none;
-            font-size: 0.9em;
-        }
-        .center {
-            text-align: center;
-        }
-        #status {
-            margin-bottom: .5em;
-            background-color: #555;
-            color: #fff;
-            border: none;
-            padding: .5em;
-            border-radius: 5px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        /* Image container styles */
-        #image-container {
-            display: flex;
-            flex-wrap: wrap;
-            margin-top: .5em;
-            background-color: #333;
-            padding: .5em;
-            border-radius: 5px;
-        }
-        .image-wrapper {
-            position: relative;
-            margin: 0;
-            padding: 0;
-            display: inline-block;
-        }
-        .image-wrapper img {
-            max-width: 100%;
-            width: 400px; /* Increased size */
-            height: auto;
-            margin: 0;
-            cursor: pointer;
-            display: block;
-        }
-        .download-button {
-            position: absolute;
-            bottom: 5px;
-            right: 5px;
-            padding: 2px 5px;
-            font-size: 12px;
-            background-color: #fa0;
-            color: #000;
-            border: none;
-            border-radius: 3px;
-            cursor: pointer;
-            opacity: 0.8;
-        }
-        .download-button:hover {
-            opacity: 1;
-        }
-        /* Remove gaps between images */
-        #image-container {
-            margin: 0;
-            padding: 0;
-        }
-        .image-wrapper {
-            margin: 0;
-        }
-        /* Remove gap between rows */
-        #image-container {
-            align-items: flex-start;
-        }
-        .attachments { font-size: 12px; margin-top: 5px; }
-        .attachment-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .attachments button { padding: 2px 7px; font-size: 12px; cursor: pointer; }
-        button:disabled { opacity: .4; cursor: not-allowed; }
-        #image-capabilities { color: #bbb; }
-        #init-image-name { list-style: none; padding: 0; margin: 3px 0 0; max-height: 96px; overflow-y: auto; }
-        #init-image-name:empty { display: none; }
-        #init-image-name li { display: flex; align-items: center; gap: 4px; margin: 1px 0; }
-        .attachment-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-        .attachment-action { flex: none; background: transparent; color: #ddd; border: 0; }
-        @media (max-width: 640px) {
-            .row .col {
-                display: block;
-                width: 100%;
-                padding-right: 0;
-            }
-            #generate-button {
-                width: 100%;
-            }
-            .image-wrapper img {
-                width: 100%;
-            }
-        }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } progress:indeterminate { background-position: center; } }
     </style>
 </head>
 <body>
-    <div class="c">
-        <h1>MFLUX Server - Image Generation</h1>
-        ...using the <a href="https://github.com/orbiter/mflux-server">mflux-server</a> (Github <a href="https://github.com/orbiter/mflux-server">https://github.com/orbiter/mflux-server</a>)
-        <div>
-            <select id="model-select"></select>
-        </div>
-        <!-- Input Container -->
-        <div class="input-container">
-            <form id="generate-form">
-                <!-- First Line: Prompt and mflux-server -->
-                <div class="row">
-                    <div class="col 7">
-                        <div class="input-group">
-                            <label class="input-label" for="prompt">Prompt:</label>
-                            <textarea id="prompt" name="prompt" rows="3"></textarea>
-                            <div class="attachments">
-                                <div class="attachment-toolbar">
-                                    <button type="button" id="add-image-button" class="btn" disabled>+ Images</button>
-                                    <input type="file" id="init-image" accept="image/*" multiple hidden disabled>
-                                    <button type="button" id="delete-init-image-button" class="attachment-action" hidden>Clear</button>
-                                    <span id="image-capabilities" role="status" aria-live="polite">Checking image support…</span>
-                                </div>
-                                <ol id="init-image-name" aria-label="Attached images"></ol>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col 2">
-                        <div class="input-group">
-                            <label class="input-label" for="mflux-server">mflux-server:</label>
-                            <input type="text" id="mflux-server" name="mflux-server" value="http://127.0.0.1:4030" style="width: 180px;">
-                        </div>
-                    </div>
-                </div>
-                <!-- Second Line: Sliders and Seed -->
-                <div class="row">
-                    <div class="col 2">
-                        <div class="input-group">
-                            <label class="input-label" for="width">Width:</label>
-                            <input type="range" id="width" name="width" min="64" max="2560" step="8" value="512">
-                            <div><span id="width-value">512</span> px</div>
-                        </div>
-                    </div>
-                    <div class="col 2">
-                        <div class="input-group">
-                            <label class="input-label" for="height">Height:</label>
-                            <input type="range" id="height" name="height" min="64" max="2560" step="8" value="512">
-                            <div><span id="height-value">512</span> px</div>
-                        </div>
-                    </div>
-                    <div class="col 1">
-                        <div class="input-group">
-                            <label class="input-label" for="aspect-ratio">Aspect Ratio:</label>
-                            <div id="aspect-ratio" style="color: lightgreen">1:1</div>
-                        </div>
-                    </div>                    
-                    <div class="col 2">
-                        <div class="input-group">
-                            <label class="input-label" for="steps">Inference Steps:</label>
-                            <input type="range" id="steps" name="steps" min="1" max="50" step="1" value="40">
-                            <div><span id="steps-value">40</span></div>
-                        </div>
-                    </div>
-                    <div class="col 2">
-                        <div class="input-group">
-                            <label class="input-label" for="quality">JPEG Quality:</label>
-                            <input type="range" id="quality" name="quality" min="1" max="100" step="1" value="85">
-                            <div><span id="quality-value">85</span></div>
-                        </div>
-                    </div>
-                    <div class="col 2">
-                        <div class="input-group">
-                            <label class="input-label" for="count">Count:</label>
-                            <input type="range" id="count" name="count" min="1" max="16" step="1" value="1">
-                            <div><span id="count-value">1</span></div>
-                        </div>
-                    </div>
-                    <div class="col 2">
-                        <div class="input-group">
-                            <label class="input-label" for="seed">Seed (optional):</label>
-                            <input type="text" id="seed" name="seed" placeholder="Leave blank for random seed" class="full-width">
-                        </div>
-                    </div>
-                </div>
-                <!-- Generate Image Button -->
-                <div class="row center">
-                    <button type="submit" class="btn primary" id="generate-button">Generate Image(s)</button>
-                </div>
-            </form>
-        </div>
-        <!-- Output Container -->
-        <div class="output-container">
-            <!-- Status Field (No Headline) -->
+    <header>
+        <a href="#workspace" aria-label="MFLUX Studio home">
+            <svg width="23" height="26" viewBox="0 0 23 26" fill="none" aria-hidden="true"><path d="M2 20V6l9.5 9L21 6v14M2 1l9.5 9L21 1" stroke="currentColor" stroke-width="1.5"/></svg>
+            MFLUX <span>STUDIO</span>
+        </a>
+        <nav aria-label="Workspace"><a href="#workspace" aria-current="page">Generate</a><a href="#results">Images</a></nav>
+        <details>
+            <summary aria-label="Server connection settings"><span id="connection-state">Connecting…</span></summary>
             <div>
-                <textarea id="status" rows="2" readonly></textarea>
+                <label for="mflux-server">Server address<input type="url" id="mflux-server" name="mflux-server" value="http://127.0.0.1:4030" spellcheck="false"></label>
+                <p>Connect to your mflux server. This address is remembered in this browser.</p>
+                <p><a id="api-docs" href="/swagger" target="_blank" rel="noopener">API documentation ↗</a></p>
             </div>
-            <!-- Image Container -->
-            <div id="image-container"></div>
-        </div>
-    </div>
+        </details>
+    </header>
+    <main id="workspace">
+        <aside aria-label="Image generation controls">
+            <header><p>LOCAL IMAGE GENERATION</p></header>
+            <form id="generate-form">
+                <fieldset>
+                    <legend><span>01 /</span> Model &amp; prompt</legend>
+                    <label for="model-select">Model<select id="model-select" aria-label="Generation model"><option value="" disabled selected>Connecting to server…</option></select></label>
+                    <label for="prompt">Prompt<textarea id="prompt" name="prompt" rows="4" placeholder="Describe the image you have in mind…"></textarea></label>
+                    <menu aria-label="Reference image controls">
+                        <li><button type="button" id="add-image-button" disabled>＋ Add images</button><input type="file" id="init-image" accept="image/*" multiple hidden disabled></li>
+                        <li><button type="button" id="delete-init-image-button" hidden>Clear</button></li>
+                        <li><small id="image-capabilities" role="status" aria-live="polite">Checking image support…</small></li>
+                    </menu>
+                    <ol id="init-image-name" aria-label="Ordered reference images"></ol>
+                </fieldset>
+                <fieldset>
+                    <legend><span>02 /</span> Image settings</legend>
+                    <div>
+                        <label for="width">Width <output><span id="width-value">512</span> px</output><input type="range" id="width" name="width" min="64" max="2560" step="8" value="512"></label>
+                        <label for="height">Height <output><span id="height-value">512</span> px</output><input type="range" id="height" name="height" min="64" max="2560" step="8" value="512"></label>
+                        <label for="steps">Steps <output id="steps-value">40</output><input type="range" id="steps" name="steps" min="1" max="200" step="1" value="40"></label>
+                        <label for="count">Images <output id="count-value">1</output><input type="range" id="count" name="count" min="1" max="16" step="1" value="1"></label>
+                        <label for="seed">Seed <small>optional</small><input type="text" id="seed" name="seed" placeholder="Random" inputmode="numeric"></label>
+                        <label>Aspect ratio<output id="aspect-ratio" data-standard="true" aria-label="Image aspect ratio">1:1</output></label>
+                    </div>
+                </fieldset>
+                <details id="advanced-controls">
+                    <summary>Model and generation settings</summary>
+                    <fieldset>
+                        <legend>Rendering</legend>
+                        <div>
+                            <label for="guidance">Guidance<input id="guidance" type="number" step="0.1" min="0"></label>
+                            <label for="output-format">File format<select id="output-format"><option>PNG</option><option>JPEG</option></select></label>
+                        </div>
+                        <label for="quality">JPEG quality<output id="quality-value">85</output><input type="range" id="quality" name="quality" min="1" max="100" step="1" value="85"></label>
+                    </fieldset>
+                    <fieldset><legend>Generation options</legend><div id="generation-options"></div><div id="auxiliary-inputs"></div></fieldset>
+                    <fieldset>
+                        <legend>Model loading</legend>
+                        <label for="quantization">Model quantization<select id="quantization"></select></label>
+                        <div id="load-options"></div>
+                        <label for="model-source">Saved model or Hugging Face repository<input id="model-source" list="saved-models" type="text" placeholder="Optional · uses the selected model family"></label>
+                        <datalist id="saved-models"></datalist>
+                        <p id="model-options-hint">Loading these settings reloads the weights. Optional acceleration can change the image.</p>
+                        <button id="apply-model-options" type="button">Load with these settings</button>
+                    </fieldset>
+                </details>
+                <footer><button type="submit" id="generate-button">Generate images <span aria-hidden="true">↗</span></button></footer>
+            </form>
+        </aside>
+        <section id="results" aria-label="Generated images">
+            <header><div><p>THE CREATIVE WORKSPACE</p><h2>Your images <output id="result-count" aria-label="Completed images">0</output></h2></div><small>Current batch</small></header>
+            <fieldset id="generation-progress" aria-label="Generation progress" data-state="idle">
+                <div><label for="batch-progress">All images</label><output id="batch-status">0 / 0 complete · 0%</output></div>
+                <progress id="batch-progress" max="1" value="0" aria-describedby="batch-status"></progress>
+                <div><label for="image-progress">Current image</label><output id="status" role="status" aria-live="polite">Ready when you are.</output></div>
+                <progress id="image-progress" max="1" value="0" aria-describedby="status"></progress>
+            </fieldset>
+            <div id="image-container" role="list" aria-label="Generated image results">
+                <article data-empty>
+                    <svg viewBox="0 0 90 90" fill="none" aria-hidden="true"><path d="M1 22V1h21m46 0h21v21m0 46v21H68m-46 0H1V68" stroke="currentColor"/><rect x="16" y="16" width="58" height="58" rx="2" stroke="currentColor" stroke-dasharray="2 5" opacity=".35"/><path d="m24 61 16-19 11 12 8-8 9 15H24Z" stroke="currentColor"/><circle cx="58" cy="32" r="5" stroke="currentColor"/><path d="M40 8h10M45 3v10M40 82h10M45 77v10" stroke="currentColor" opacity=".5"/></svg>
+                    <p>Your images will appear in this space.</p>
+                </article>
+            </div>
+            <footer><span>PNG / JPEG</span><p>Full-resolution images &amp; generation recipes</p></footer>
+        </section>
+    </main>
+    <footer><p>MFLUX · On-device image generation</p><a href="https://github.com/orbiter/mflux-server" target="_blank" rel="noopener">Open source ↗</a></footer>
+
     <script>
         // List of allowed image size values
         const widthValues  = [256, 320, 512, 640, 768, 800, 1024, 1280, 1920, 2048, 2560];
@@ -319,6 +291,8 @@
         var imageInfo = null;
         var infoRevision = 0;
         var modelLoading = false;
+        var batchRunning = false;
+        var modelCatalog = {};
 
         document.addEventListener('DOMContentLoaded', function() {
 
@@ -337,7 +311,7 @@
                 document.getElementById('add-image-button').title = limit > 1 ?
                     'Add up to ' + limit + ' images. Use the list numbers to refer to them in your prompt.' : 'Add an image';
                 document.getElementById('delete-init-image-button').hidden = !initImageFiles.length;
-                document.getElementById('generate-button').disabled = modelLoading || invalid;
+                document.getElementById('generate-button').disabled = modelLoading || invalid || batchRunning;
                 document.getElementById('image-capabilities').textContent = message || (
                     !imageInfo ? 'Checking image support…' :
                     invalid ? 'Remove attachments: this model allows ' + limit + '.' :
@@ -348,14 +322,12 @@
                 initImageFiles.forEach(function(file, index) {
                     const row = document.createElement('li');
                     const name = document.createElement('span');
-                    name.className = 'attachment-name';
                     name.textContent = (index + 1) + '. ' + file.name;
                     name.title = file.name;
                     row.appendChild(name);
                     [['↑', 'Move up', -1], ['↓', 'Move down', 1], ['×', 'Remove', 0]].forEach(function(action) {
                         const button = document.createElement('button');
                         button.type = 'button';
-                        button.className = 'attachment-action';
                         button.textContent = action[0];
                         button.title = action[1];
                         button.setAttribute('aria-label', action[1] + ' ' + file.name);
@@ -417,6 +389,8 @@
             mfluxServerInput.addEventListener('input', function() {
                 mfluxendpoint = mfluxServerInput.value.replace(/\/$/, '');
                 localStorage.setItem('mflux-server', mfluxendpoint);
+                document.getElementById('connection-state').textContent = 'Connecting…';
+                document.getElementById('connection-state').parentElement.dataset.connected = 'false';
                 infoRevision++;
                 imageInfo = null;
                 renderInputImages();
@@ -443,12 +417,7 @@
                 const aspectRatioElement = document.getElementById('aspect-ratio');
                 aspectRatioElement.textContent = aspectRatio;
 
-                // Set color based on whether aspect ratio is accepted
-                if (acceptedAspectRatio.includes(aspectRatio)) {
-                    aspectRatioElement.style.color = "lightgreen";
-                } else {
-                    aspectRatioElement.style.color = "red"; // Reset to default color
-                }
+                aspectRatioElement.dataset.standard = String(acceptedAspectRatio.includes(aspectRatio));
             }
 
             var rangeInputs = [
@@ -466,9 +435,12 @@
                 input.addEventListener('input', function() {
                     let v = input.value;
                     if (allowed) {
-                        v = allowed.reduce((prev, curr) =>
-                            Math.abs(curr - v) < Math.abs(prev - v) ? curr : prev
-                        );
+                        const multiple = imageInfo ? imageInfo.dimension_multiple || 16 : 16;
+                        const minimum = imageInfo ? imageInfo.min_dimension || multiple : multiple;
+                        const maximum = imageInfo && imageInfo.max_dimension || Number(input.max);
+                        const choices = allowed.filter(value => value % multiple === 0 && value >= minimum && value <= maximum);
+                        v = choices.length ? choices.reduce((prev, curr) =>
+                            Math.abs(curr - v) < Math.abs(prev - v) ? curr : prev) : Math.max(minimum, Math.round(v / multiple) * multiple);
                         input.value = v;
                     }
                     document.getElementById(input.id + '-value').textContent = v;
@@ -477,10 +449,105 @@
                 });
             });
 
+            const controlDefinitions = {
+                negative_prompt: ['Negative prompt', 'text'], scheduler: ['Sampler', 'select'],
+                step_cache_ratio: ['Step reuse ratio (optional)', 'number'], cfg_end: ['Guidance end fraction (optional)', 'number'],
+                use_kv_cache: ['Reuse prompt attention', 'checkbox'], use_step_cache: ['Reuse stable edit steps', 'checkbox'],
+                step_cache_threshold: ['Edit reuse threshold (optional)', 'number'], strength: ['Edit strength (optional)', 'number'],
+                auto_mask: ['Object to mask automatically (optional)', 'text'], enhance_prompt: ['Enhance edit instruction', 'checkbox'],
+                verify: ['Verify edit result', 'checkbox'], verify_retries: ['Verification retries (optional)', 'number'],
+                render_text_images: ['Render caption text for conditioning', 'checkbox'], uncond_skip_layers: ['Negative-branch skipped layers (comma separated; [] disables)', 'list'],
+                controlnet_strength: ['Control strength', 'number'], output_resolution: ['Reference resolution budget (optional)', 'number'],
+                preset: ['Sampler preset', 'select'], strict_caption_validation: ['Strict caption validation', 'checkbox'],
+                small_text_encoder: ['Use smaller text encoder (experimental)', 'checkbox'], small_decoder: ['Use smaller decoder', 'checkbox'],
+                vae_full_precision: ['Full-image VAE decode (more memory)', 'checkbox'], bake_lora: ['Merge adapters into weights', 'policy'],
+                compute_precision: ['Attention compute precision', 'precision'], text_encoder_quantize: ['Text encoder quantization', 'bits'],
+                qwen21_backend: ['Qwen editing backend', 'backend'], lora_paths: ['LoRA paths or repositories (one per line)', 'paths'],
+                lora_scales: ['LoRA scales (comma separated, optional)', 'list'], controlnet_path: ['ControlNet path or repository (optional)', 'text']
+            };
+            function readImage(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader(); reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => reject(new Error('Could not read ' + file.name)); reader.readAsDataURL(file);
+                });
+            }
+            function makeControl(container, field, settings, loading) {
+                const definition = controlDefinitions[field]; if (!definition) return;
+                const [labelText, kind] = definition;
+                const wrapper = document.createElement('label'); wrapper.textContent = labelText;
+                const input = document.createElement(['select','policy','precision','bits','backend'].includes(kind) ? 'select' : kind === 'paths' ? 'textarea' : 'input');
+                input.dataset.field = field; input.dataset.kind = kind;
+                input.id = (loading ? 'load-' : 'generate-') + field; wrapper.htmlFor = input.id;
+                if (kind === 'checkbox') input.type = 'checkbox';
+                if (kind === 'number') { input.type = 'number'; input.step = 'any'; }
+                const choices = kind === 'select' ? (field === 'preset' ? Object.keys(settings.presets || {}) : settings.schedulers || []) :
+                    kind === 'policy' ? ['default','true','false'] : kind === 'precision' ? ['bfloat16','float16'] :
+                    kind === 'bits' ? ['default',...(settings.quantization || [])] : kind === 'backend' ? ['native','legacy'] : [];
+                choices.forEach(value => { const option = document.createElement('option'); option.value = value; option.textContent = value; input.appendChild(option); });
+                let value = loading ? (settings.options || {})[field] : undefined;
+                if (value === undefined && field === 'use_kv_cache') value = settings.context_kv_cache !== false;
+                if (value === undefined && field === 'render_text_images') value = true;
+                if (value === undefined && field === 'preset') value = settings.default_preset;
+                if (value !== undefined) {
+                    if (kind === 'checkbox') input.checked = value;
+                    else input.value = Array.isArray(value) ? value.join(kind === 'paths' ? '\n' : ',') : String(value);
+                }
+                wrapper.appendChild(input); container.appendChild(wrapper);
+            }
+            function renderModelControls(settings) {
+                document.getElementById('guidance').value = settings.default_guidance ?? settings.guidance ?? 3.5;
+                document.getElementById('guidance').disabled = settings.guidance_fixed !== null && settings.guidance_fixed !== undefined;
+                document.getElementById('output-format').value = settings.default_format || 'JPEG';
+                const quant = document.getElementById('quantization'); quant.replaceChildren();
+                ['stored',...(settings.quantization || [4,8])].forEach(value => { const option = document.createElement('option'); option.value = value; option.textContent = value; quant.appendChild(option); });
+                quant.value = settings.quantize ?? 'stored';
+                for (const [id, fields, loading] of [['generation-options',settings.generation_options || [],false],['load-options',settings.load_options || [],true]]) {
+                    const container = document.getElementById(id); container.replaceChildren(); fields.forEach(field => makeControl(container, field, settings, loading));
+                }
+                const aux = document.getElementById('auxiliary-inputs'); aux.replaceChildren();
+                for (const [field, supported, labelText] of [['mask_image',settings.mask,'Edit mask (white regenerates)'],['control_image',settings.control_image,'Control image'],['depth_image',settings.depth_image,'Prepared depth map']]) {
+                    if (!supported) continue;
+                    const wrapper = document.createElement('label'); wrapper.textContent = labelText;
+                    const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'; input.dataset.field = field;
+                    input.id = 'aux-' + field; wrapper.htmlFor = input.id;
+                    wrapper.appendChild(input); aux.appendChild(wrapper);
+                }
+                for (const axis of ['width','height']) {
+                    const input = document.getElementById(axis); const multiple = settings.dimension_multiple || 16;
+                    input.step = multiple; input.min = settings.min_dimension || multiple; input.max = settings.max_dimension || 2560;
+                    input.value = Math.min(Number(input.max), Math.max(Number(input.min), Math.round(Number(input.value)/multiple)*multiple));
+                    document.getElementById(axis + '-value').textContent = input.value;
+                }
+            }
+            function collectControls(id) {
+                const values = {};
+                document.querySelectorAll('#' + id + ' [data-field]').forEach(input => {
+                    const field = input.dataset.field, kind = input.dataset.kind;
+                    if (kind === 'checkbox') { if (id === 'generation-options' || input.checked) values[field] = input.checked; return; }
+                    if (field === 'negative_prompt') { values[field] = input.value; return; }
+                    if (!input.value.trim() || input.value === 'default') return;
+                    if (kind === 'paths') values[field] = input.value.split('\n').map(value => value.trim()).filter(Boolean);
+                    else if (kind === 'list') values[field] = input.value.trim() === '[]' ? [] : input.value.split(',').filter(value => value.trim()).map(Number);
+                    else if (kind === 'number' || kind === 'bits') values[field] = Number(input.value);
+                    else if (kind === 'policy') values[field] = input.value === 'true';
+                    else values[field] = input.value;
+                });
+                return values;
+            }
+            function modelLoadPayload(name) {
+                const custom = document.getElementById('model-source').value.trim();
+                const bits = document.getElementById('quantization').value;
+                return {model: custom || name, ...(custom ? {base_model: name} : {}),
+                    quantize: bits === 'stored' ? null : Number(bits), options: collectControls('load-options')};
+            }
+
             function applyModelDefaults(settings) {
                 if (!settings) return;
                 if (settings.model) {
                     var modelSelect = document.getElementById('model-select');
+                    if (!Array.from(modelSelect.options).some(option => option.value === settings.model)) {
+                        const option = document.createElement('option'); option.value = settings.model; option.textContent = settings.model; modelSelect.appendChild(option);
+                    }
                     if (modelSelect.value !== settings.model) {
                         modelSelect.value = settings.model;
                     }
@@ -488,10 +555,34 @@
                 if (settings.default_steps) {
                     var stepsInput = document.getElementById('steps');
                     var stepsValue = document.getElementById('steps-value');
+                    stepsInput.min = settings.min_steps || 1;
+                    stepsInput.max = settings.max_steps || Math.max(200, settings.default_steps);
+                    stepsInput.disabled = settings.fixed_steps !== null && settings.fixed_steps !== undefined;
                     stepsInput.value = settings.default_steps;
                     stepsValue.textContent = settings.default_steps;
                     updateSliderBackground(stepsInput);
                 }
+                renderModelControls(settings);
+            }
+
+            function renderGenerationProgress(state) {
+                const overall = state.total ? Math.min(1, (state.completed + (state.active ? state.lastFraction : 0)) / state.total) : 0;
+                document.getElementById('batch-progress').value = overall;
+                document.getElementById('batch-status').value = state.completed + ' / ' + state.total + ' complete · ' + Math.floor(overall * 100) + '%' + (state.error ? ' · Stopped' : '');
+                const current = document.getElementById('image-progress');
+                if (state.currentFraction === null) current.removeAttribute('value');
+                else current.value = state.currentFraction;
+                document.getElementById('status').value = state.message;
+                document.getElementById('generation-progress').dataset.state = state.error ? 'error' : state.completed === state.total ? 'done' : 'running';
+            }
+
+            function updateGenerationProgress(state, fraction, message, samplingFraction = undefined) {
+                state.fraction = typeof fraction === 'number' && Number.isFinite(fraction) ? Math.min(state.active ? 0.95 : 1, Math.max(0, fraction)) : null;
+                state.currentFraction = samplingFraction === undefined ? state.fraction :
+                    typeof samplingFraction === 'number' && Number.isFinite(samplingFraction) ? Math.min(1, Math.max(0, samplingFraction)) : null;
+                if (state.fraction !== null) state.lastFraction = Math.max(state.lastFraction, state.fraction);
+                state.message = message;
+                renderGenerationProgress(state);
             }
 
             async function loadServerSettings(updateDefaults = true) {
@@ -502,12 +593,19 @@
                     if (!response.ok) throw new Error('Image support unavailable');
                     const settings = await response.json();
                     if (revision !== infoRevision || endpoint !== mfluxendpoint) return null;
+                    document.getElementById('connection-state').textContent = 'Connected';
+                    document.getElementById('connection-state').parentElement.dataset.connected = 'true';
+                    document.getElementById('api-docs').href = endpoint + '/swagger';
+                    const changed = imageInfo && (settings.model !== imageInfo.model ||
+                        JSON.stringify(settings.load) !== JSON.stringify(imageInfo.load));
                     imageInfo = settings;
-                    if (updateDefaults) applyModelDefaults(settings);
+                    if (updateDefaults || changed) applyModelDefaults(settings);
                     renderInputImages();
                     return settings;
                 } catch (error) {
                     if (revision === infoRevision) {
+                        document.getElementById('connection-state').textContent = 'Server unavailable';
+                        document.getElementById('connection-state').parentElement.dataset.connected = 'false';
                         imageInfo = null;
                         renderInputImages('Image support unavailable');
                     }
@@ -521,6 +619,7 @@
                     const response = await fetch(endpoint + '/api/ls');
                     if (!response.ok) throw new Error('Failed to load models.');
                     const models = await response.json();
+                    modelCatalog = models;
                     if (endpoint !== mfluxendpoint) return;
                     const select = document.getElementById('model-select');
                     select.replaceChildren();
@@ -546,9 +645,9 @@
                 try {
                     const response = await fetch(endpoint + '/api/load', {
                         method: 'POST', headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({model: modelName})
+                        body: JSON.stringify(modelLoadPayload(modelName))
                     });
-                    if (!response.ok) throw new Error('Failed to load model.');
+                    if (!response.ok) { const body = await response.json(); throw new Error(body.error || 'Failed to load model.'); }
                 } catch (error) {
                     document.getElementById('status').value = error.message;
                 } finally {
@@ -559,9 +658,18 @@
             }
 
             document.getElementById('model-select').addEventListener('change', function(event) {
+                document.getElementById('model-source').value = '';
+                renderModelControls({...modelCatalog[event.target.value], model: event.target.value});
                 loadSelectedModel(event.target.value);
             });
 
+            document.getElementById('apply-model-options').addEventListener('click', function() {
+                loadSelectedModel(document.getElementById('model-select').value);
+            });
+            fetch(mfluxendpoint + '/api/saved').then(response => response.json()).then(data => {
+                const list = document.getElementById('saved-models');
+                (data.models || []).forEach(path => { const option = document.createElement('option'); option.value = path; list.appendChild(option); });
+            }).catch(() => {});
             loadModelOptions();
 
             // Handle form submission
@@ -571,198 +679,153 @@
                 generateImages();
             });
 
-            function generateImages() {
-                // Update mfluxendpoint in case it was changed
-                mfluxendpoint = mfluxServerInput.value.replace(/\/$/, '');
-
-                // Collect input values
-                var prompt = document.getElementById('prompt').value;
-                var width = parseInt(document.getElementById('width').value);
-                var height = parseInt(document.getElementById('height').value);
-                var steps = parseInt(document.getElementById('steps').value);
-                var seed = document.getElementById('seed').value;
-                var quality = parseInt(document.getElementById('quality').value);
-                var count = parseInt(document.getElementById('count').value);
-
-                var dataTemplate = {
-                    "prompt": prompt,
-                    "height": height,
-                    "width": width,
-                    "steps": steps,
-                    "format": "JPEG",
-                    "quality": quality,
-                    "priority": false,
-                    "init_images": []
-                };
-
-                var statusTextArea = document.getElementById('status');
-                var imageContainer = document.getElementById('image-container');
-
-                statusTextArea.value = "Starting image generation...";
-                imageContainer.innerHTML = ''; // Clear previous images
-
-                // Generate timestamp for filenames
-                var timestamp = getFormattedTimestamp();
-                var currentIndex = 0;
-
+            async function generateImages() {
+                if (batchRunning) return;
+                const endpoint = mfluxServerInput.value.replace(/\/$/, '');
+                const prompt = document.getElementById('prompt').value;
+                const count = parseInt(document.getElementById('count').value);
+                const seed = document.getElementById('seed').value;
+                const state = {total: count, completed: 0, active: true, fraction: null,
+                    lastFraction: 0, message: '', error: false};
+                const imageContainer = document.getElementById('image-container');
+                const timestamp = getFormattedTimestamp();
                 const selectedFiles = initImageFiles.slice();
-                if (selectedFiles.length) {
-                    loadServerSettings(false)
-                    .then(function(info) {
+                const auxiliary = Array.from(document.querySelectorAll('#auxiliary-inputs input')).filter(input => input.files.length);
+                const dataTemplate = {
+                    prompt,
+                    height: parseInt(document.getElementById('height').value),
+                    width: parseInt(document.getElementById('width').value),
+                    steps: parseInt(document.getElementById('steps').value),
+                    format: document.getElementById('output-format').value,
+                    quality: parseInt(document.getElementById('quality').value),
+                    guidance: Number(document.getElementById('guidance').value),
+                    priority: false, init_images: [],
+                    ...collectControls('generation-options')
+                };
+                batchRunning = true;
+                document.getElementById('model-select').disabled = true;
+                document.getElementById('apply-model-options').disabled = true;
+                mfluxServerInput.disabled = true;
+                renderInputImages();
+                imageContainer.replaceChildren();
+                document.getElementById('result-count').value = '0';
+                updateGenerationProgress(state, null, 'Preparing image 1 / ' + count);
+
+                try {
+                    if (selectedFiles.length || auxiliary.length) {
+                        const info = await loadServerSettings(false);
                         if (!info) throw new Error('Could not check image input support.');
                         if (selectedFiles.length > imageLimit(info)) {
                             throw new Error(info.model + ' accepts at most ' + imageLimit(info) + ' input image(s).');
                         }
-                        return Promise.all(selectedFiles.map(function(file) {
-                            return new Promise(function(resolve, reject) {
-                                const reader = new FileReader();
-                                reader.onload = function() { resolve(reader.result); };
-                                reader.onerror = function() { reject(new Error('Could not read ' + file.name)); };
-                                reader.readAsDataURL(file);
-                            });
-                        }));
-                    })
-                    .then(function(images) {
-                        dataTemplate.init_images = images;
-                        generateNextImage();
-                    })
-                    .catch(function(error) { statusTextArea.value = error.message; });
-                } else {
-                    generateNextImage();
-                }
-
-                function generateNextImage() {
-                    if (currentIndex >= count) {
-                        statusTextArea.value = "All images generated.";
-                        return;
+                        const images = await Promise.all([...selectedFiles.map(file => readImage(file)),
+                            ...auxiliary.map(input => readImage(input.files[0]))]);
+                        dataTemplate.init_images = images.slice(0, selectedFiles.length);
+                        auxiliary.forEach((input, index) => { dataTemplate[input.dataset.field] = images[selectedFiles.length + index]; });
                     }
 
-                    var data = Object.assign({}, dataTemplate);
-
-                    // If seed is not provided, remove it to get a random seed each time
-                    if (seed === "") {
-                        delete data["seed"];
-                    } else {
-                        data["seed"] = seed;
-                    }
-
-                    var body = JSON.stringify(data);
-                    var imageNumber = currentIndex + 1;
-                    statusTextArea.value = "Generating image " + imageNumber + " of " + count + "...";
-
-                    // Send POST request to /generate
-                    fetch(mfluxendpoint + '/api/generate', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: body
-                    })
-                    .then(function(response) {
-                        if (!response.ok) {
-                            throw new Error('Failed to start image generation.');
-                        }
-                        return response.json();
-                    })
-                    .then(function(jsonResp) {
-                        var task_id = jsonResp["task_id"];
-                        var expected_time = jsonResp["expected_time_seconds"];
-                        statusTextArea.value = "Task " + imageNumber + " started. Expected time: " + expected_time.toFixed(1) + " seconds.";
-                        // Start polling for status
-                        pollStatus(task_id, imageNumber);
-                    })
-                    .catch(function(error) {
-                        statusTextArea.value = error.message;
-                    });
-                }
-
-                function pollStatus(task_id, imageNumber) {
-                    var pollInterval = setInterval(function() {
-                        fetch(mfluxendpoint + '/api/status?task_id=' + task_id)
-                        .then(function(response) {
-                            if (!response.ok) {
-                                throw new Error('Failed to get status.');
-                            }
-                            return response.json();
-                        })
-                        .then(function(statusJson) {
-                            var status = statusJson["status"];
-                            if (status === "error") {
-                                throw new Error(statusJson["error"] || 'Image generation failed.');
-                            }
-                            if (status === "done") {
-                                clearInterval(pollInterval);
-                                // Get the image
-                                fetch(mfluxendpoint + '/api/image?task_id=' + task_id + '&base64=false&delete=true')
-                                .then(function(imageResp) {
-                                    if (!imageResp.ok) {
-                                        throw new Error('Failed to retrieve image.');
-                                    }
-                                    return imageResp.blob();
-                                })
-                                .then(function(imageBlob) {
-                                    var imageUrl = URL.createObjectURL(imageBlob);
-                                    var imgWrapper = createImageElement(imageUrl, imageNumber, timestamp);
-                                    imageContainer.appendChild(imgWrapper);
-                                    statusTextArea.value = "Image " + imageNumber + " of " + count + " generated.";
-                                    currentIndex++;
-                                    // Generate next image
-                                    generateNextImage();
-                                })
-                                .catch(function(error) {
-                                    statusTextArea.value = error.message;
-                                });
-                            } else {
-                                var wait_remaining = statusJson["wait_remaining"] || 1;
-                                var pos = statusJson["pos"] || 0;
-                                var statusText = "Generating image " + imageNumber + " of " + count + ": Status: " + status + ", Position in queue: " + pos + ", Estimated wait time: " + wait_remaining.toFixed(1) + " seconds.";
-                                statusTextArea.value = statusText;
-                            }
-                        })
-                        .catch(function(error) {
-                            clearInterval(pollInterval);
-                            statusTextArea.value = error.message;
+                    for (let index = 0; index < count; index++) {
+                        const imageNumber = index + 1;
+                        const title = 'Image ' + imageNumber + ' / ' + count;
+                        state.active = true;
+                        state.lastFraction = 0;
+                        let lastSamplingFraction;
+                        let lastSamplingStats = '';
+                        updateGenerationProgress(state, 0, title + ' · Queuing');
+                        const data = {...dataTemplate, ...(seed === '' ? {} : {seed})};
+                        const response = await fetch(endpoint + '/api/generate', {
+                            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
                         });
-                    }, 1000); // Poll every 1 second
+                        const submitted = await response.json();
+                        if (!response.ok) throw new Error(submitted.error || 'Failed to start image generation.');
+                        const taskId = encodeURIComponent(submitted.task_id);
+
+                        // Await each response before polling again: no overlapping polls or duplicate downloads.
+                        while (true) {
+                            const statusResponse = await fetch(endpoint + '/api/status?task_id=' + taskId);
+                            if (!statusResponse.ok) throw new Error('Failed to get image status.');
+                            const status = await statusResponse.json();
+                            const progress = status.progress || {};
+                            if (typeof progress.sampling_fraction === 'number') lastSamplingFraction = progress.sampling_fraction;
+                            if (progress.sampling_stats) lastSamplingStats = progress.sampling_stats;
+                            if (status.status === 'error') throw new Error(status.error || 'Image generation failed.');
+                            if (status.status === 'done') break;
+                            if (progress.phase === 'queued' || (!progress.phase && status.pos > 0)) {
+                                updateGenerationProgress(state, 0, title + ' · Waiting in queue' + (status.pos > 0 ? ' (' + status.pos + ')' : ''));
+                            } else if (progress.phase === 'sampling') {
+                                const pass = progress.attempt > 1 ? 'Pass ' + progress.attempt + ' · ' : '';
+                                const steps = progress.total_steps ? 'Step ' + progress.step + ' / ' + progress.total_steps : 'Sampling';
+                                const details = progress.sampling_stats || steps;
+                                updateGenerationProgress(state, progress.fraction, title + ' · ' + pass + details,
+                                    progress.sampling_fraction === null ? undefined : progress.sampling_fraction);
+                            } else if (progress.phase === 'finishing') {
+                                updateGenerationProgress(state, progress.fraction, title + ' · Finishing image' +
+                                    (lastSamplingStats ? ' · ' + lastSamplingStats : ''), lastSamplingFraction);
+                            } else {
+                                // Older servers and preparation stages have no measurable step fraction.
+                                updateGenerationProgress(state, null, title + (progress.phase === 'preparing' ? ' · Preparing' : ' · Generating'));
+                            }
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        }
+
+                        updateGenerationProgress(state, 0.95, title + ' · Saving result' +
+                            (lastSamplingStats ? ' · ' + lastSamplingStats : ''), lastSamplingFraction);
+                        let recipeUrl = null;
+                        try {
+                            const recipeResponse = await fetch(endpoint + '/api/recipe?task_id=' + taskId);
+                            if (recipeResponse.ok) {
+                                const recipe = await recipeResponse.json();
+                                recipeUrl = URL.createObjectURL(new Blob([JSON.stringify(recipe, null, 2)], {type: 'application/json'}));
+                            }
+                        } catch (_) { /* Image retrieval remains available when recipe retrieval fails. */ }
+                        const imageResponse = await fetch(endpoint + '/api/image?task_id=' + taskId + '&base64=false&delete=true');
+                        if (!imageResponse.ok) throw new Error('Failed to retrieve image.');
+                        const imageBlob = await imageResponse.blob();
+                        const imageUrl = URL.createObjectURL(imageBlob);
+                        imageContainer.appendChild(createImageElement(imageUrl, imageNumber, timestamp, imageBlob.type, recipeUrl));
+                        document.getElementById('result-count').value = String(imageNumber);
+                        state.completed = imageNumber;
+                        state.active = false;
+                        updateGenerationProgress(state, 1, title + ' · Complete' +
+                            (lastSamplingStats ? ' · ' + lastSamplingStats : ''));
+                    }
+                } catch (error) {
+                    state.error = true;
+                    state.active = false;
+                    updateGenerationProgress(state, state.lastFraction, error.message || String(error));
+                } finally {
+                    batchRunning = false;
+                    document.getElementById('model-select').disabled = modelLoading;
+                    document.getElementById('apply-model-options').disabled = false;
+                    mfluxServerInput.disabled = false;
+                    renderInputImages();
                 }
 
-                function createImageElement(imageUrl, imageNumber, timestamp) {
-                    var imageWrapper = document.createElement('div');
-                    imageWrapper.className = 'image-wrapper';
-
-                    var img = document.createElement('img');
-                    img.src = imageUrl;
-                    img.alt = "Generated Image";
-
-                    // Add click event to open image in new tab
-                    img.addEventListener('click', function() {
-                        window.open(imageUrl, '_blank');
-                    });
-
-                    // Create download button
-                    var downloadButton = document.createElement('button');
-                    downloadButton.textContent = 'Download';
-                    downloadButton.className = 'download-button';
-
-                    // Generate filename with timestamp
-                    var filename = 'flux-' + timestamp + '-' + imageNumber + '.jpg';
-
-                    // Add click event to download the image
-                    downloadButton.addEventListener('click', function(e) {
-                        e.stopPropagation(); // Prevent triggering img click event
-                        var a = document.createElement('a');
-                        a.href = imageUrl;
-                        a.download = filename;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                    });
-
-                    // Append img and downloadButton to imageWrapper
-                    imageWrapper.appendChild(img);
-                    imageWrapper.appendChild(downloadButton);
-
-                    return imageWrapper;
+                function createImageElement(imageUrl, imageNumber, timestamp, mimeType, recipeUrl) {
+                    const figure = document.createElement('figure');
+                    figure.setAttribute('role', 'listitem');
+                    const preview = document.createElement('a');
+                    preview.href = imageUrl; preview.target = '_blank'; preview.rel = 'noopener';
+                    preview.setAttribute('aria-label', 'Open image ' + imageNumber + ' at full resolution');
+                    const img = document.createElement('img'); img.src = imageUrl;
+                    img.alt = prompt || 'Generated image ' + imageNumber;
+                    preview.appendChild(img);
+                    const caption = document.createElement('figcaption');
+                    const title = document.createElement('span'); title.textContent = 'Image ' + String(imageNumber).padStart(2, '0');
+                    const format = mimeType === 'image/png' ? 'PNG' : 'JPEG';
+                    const metadata = document.createElement('small'); metadata.textContent = format + ' · ' + timestamp;
+                    title.appendChild(metadata);
+                    const actions = document.createElement('nav'); actions.setAttribute('aria-label', 'Downloads for image ' + imageNumber);
+                    const download = document.createElement('a'); download.href = imageUrl;
+                    download.download = 'flux-' + timestamp + '-' + imageNumber + (format === 'PNG' ? '.png' : '.jpg');
+                    download.textContent = 'Save image ↓'; actions.appendChild(download);
+                    if (recipeUrl) {
+                        const recipe = document.createElement('a'); recipe.href = recipeUrl;
+                        recipe.download = 'mflux-' + timestamp + '-' + imageNumber + '.json';
+                        recipe.textContent = 'Recipe ↓'; actions.appendChild(recipe);
+                    }
+                    caption.append(title, actions); figure.append(preview, caption);
+                    return figure;
                 }
 
                 function getFormattedTimestamp() {
